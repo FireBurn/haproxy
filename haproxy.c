@@ -7575,8 +7575,10 @@ static int maintain_proxies(void) {
 		    send_log(p, LOG_WARNING, "Proxy %s stopped.\n", p->id);
 
 		    for (l = p->listen; l != NULL; l = l->next) {
-			fd_delete(l->fd);
-			listeners--;
+			if (l->fd != -1) {
+			    fd_delete(l->fd);
+			    listeners--;
+			}
 		    }
 		    p->state = PR_STSTOPPED;
 		}
@@ -7622,14 +7624,20 @@ static void soft_stop(void) {
 static void pause_proxy(struct proxy *p) {
     struct listener *l;
     for (l = p->listen; l != NULL; l = l->next) {
+	if (l->fd == -1)
+	    continue;
 	if (shutdown(l->fd, SHUT_WR) == 0 && listen(l->fd, p->maxconn) == 0 &&
 	    shutdown(l->fd, SHUT_RD) == 0) {
 	    MY_FD_CLR(l->fd, StaticReadEvent);
 	    if (p->state != PR_STERROR)
 		p->state = PR_STPAUSED;
 	}
-	else
+	else {
+	    fd_delete(l->fd);
+	    listeners--;
+	    l->fd = -1;
 	    p->state = PR_STERROR;
+	}
     }
 }
 
