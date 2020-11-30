@@ -270,18 +270,9 @@ static inline void tasklet_insert_into_tasklet_list(struct tasklet *tl)
 	LIST_ADDQ(&sched->task_list, &tl->list);
 }
 
-/* Remove the tasklet from the tasklet list. The tasklet MUST already be there.
- * If unsure, use tasklet_remove_from_tasklet_list() instead. If used with a
- * plain task, the caller must update the task_list_size.
- * This should only be used by the thread that owns the tasklet, any other
- * thread should use tasklet_cancel().
+/* Try to remove a tasklet from the list. This call is inherently racy and may
+ * only be performed on the thread that was supposed to dequeue this tasklet.
  */
-static inline void __tasklet_remove_from_tasklet_list(struct tasklet *t)
-{
-	LIST_DEL_INIT(&t->list);
-	_HA_ATOMIC_SUB(&tasks_run_queue, 1);
-}
-
 static inline void tasklet_remove_from_tasklet_list(struct tasklet *t)
 {
 	if (MT_LIST_DEL((struct mt_list *)&t->list))

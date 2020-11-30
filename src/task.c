@@ -400,11 +400,13 @@ void process_runnable_tasks()
 		void *ctx;
 		struct task *(*process)(struct task *t, void *ctx, unsigned short state);
 
+		_HA_ATOMIC_SUB(&tasks_run_queue, 1);
+
 		t = (struct task *)LIST_ELEM(task_per_thread[tid].task_list.n, struct tasklet *, list);
 		state = (t->state & TASK_SHARED_WQ) | TASK_RUNNING;
 		state = _HA_ATOMIC_XCHG(&t->state, state);
 		__ha_barrier_atomic_store();
-		__tasklet_remove_from_tasklet_list((struct tasklet *)t);
+		LIST_DEL_INIT(&((struct tasklet *)t)->list);
 
 		ti->flags &= ~TI_FL_STUCK; // this thread is still running
 		activity[tid].ctxsw++;
