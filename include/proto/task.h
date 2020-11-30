@@ -242,23 +242,28 @@ static inline struct task *task_unlink_rq(struct task *t)
 
 static inline void tasklet_wakeup(struct tasklet *tl)
 {
+	unsigned short state = tl->state;
+
+	do {
+		/* do nothing if someone else already added it */
+		if (state & TASK_IN_LIST)
+			return;
+	} while (!_HA_ATOMIC_CAS(&tl->state, &state, state | TASK_IN_LIST));
+
+	/* at this point we're the first ones to add this task to the list */
+
 	if (likely(tl->tid < 0)) {
 		/* this tasklet runs on the caller thread */
-		if (LIST_ISEMPTY(&tl->list)) {
-			LIST_ADDQ(&task_per_thread[tid].task_list, &tl->list);
-			_HA_ATOMIC_ADD(&tasks_run_queue, 1);
-		}
+		LIST_ADDQ(&task_per_thread[tid].task_list, &tl->list);
 	} else {
 		/* this tasklet runs on a specific thread */
-		if (MT_LIST_ADDQ(&task_per_thread[tl->tid].shared_tasklet_list, (struct mt_list *)&tl->list) == 1) {
-			_HA_ATOMIC_ADD(&tasks_run_queue, 1);
-			if (sleeping_thread_mask & (1UL << tl->tid)) {
-				_HA_ATOMIC_AND(&sleeping_thread_mask, ~(1UL << tl->tid));
-				wake_thread(tl->tid);
-			}
+		MT_LIST_ADDQ(&task_per_thread[tl->tid].shared_tasklet_list, (struct mt_list *)&tl->list);
+		if (sleeping_thread_mask & (1UL << tl->tid)) {
+			_HA_ATOMIC_AND(&sleeping_thread_mask, ~(1UL << tl->tid));
+			wake_thread(tl->tid);
 		}
 	}
-
+	_HA_ATOMIC_ADD(&tasks_run_queue, 1);
 }
 
 /* Insert a tasklet into the tasklet list. If used with a plain task instead,
@@ -272,11 +277,16 @@ static inline void tasklet_insert_into_tasklet_list(struct tasklet *tl)
 
 /* Try to remove a tasklet from the list. This call is inherently racy and may
  * only be performed on the thread that was supposed to dequeue this tasklet.
+ * This way it is safe to call MT_LIST_DEL without first removing the
+ * TASK_IN_LIST bit, which must absolutely be removed afterwards in case
+ * another thread would want to wake this tasklet up in parallel.
  */
 static inline void tasklet_remove_from_tasklet_list(struct tasklet *t)
 {
-	if (MT_LIST_DEL((struct mt_list *)&t->list))
+	if (MT_LIST_DEL((struct mt_list *)&t->list)) {
+		_HA_ATOMIC_AND(&t->state, ~TASK_IN_LIST);
 		_HA_ATOMIC_SUB(&tasks_run_queue, 1);
+	}
 }
 
 /*
