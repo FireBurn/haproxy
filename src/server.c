@@ -4252,6 +4252,8 @@ int srvrq_resolution_error_cb(struct dns_requester *requester, int error_code)
 		HA_SPIN_UNLOCK(SERVER_LOCK, &s->lock);
 	}
 
+	dns_purge_resolution_answer_records(res);
+
 	return 1;
 }
 
