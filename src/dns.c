@@ -519,6 +519,7 @@ static void dns_check_dns_response(struct dns_resolution *res)
 					if (srv->srvrq == srvrq && srv->svc_port == item->port &&
 					    item->data_len == srv->hostname_dn_len &&
 					    !dns_hostname_cmp(srv->hostname_dn, item->target, item->data_len)) {
+						dns_unlink_resolution(srv->dns_requester);
 						snr_update_srv_status(srv, 1);
 						free(srv->hostname);
 						free(srv->hostname_dn);
@@ -527,7 +528,6 @@ static void dns_check_dns_response(struct dns_resolution *res)
 						srv->hostname_dn_len = 0;
 						memset(&srv->addr, 0, sizeof(srv->addr));
 						srv->svc_port = 0;
-						dns_unlink_resolution(srv->dns_requester);
 					}
 					HA_SPIN_UNLOCK(SERVER_LOCK, &srv->lock);
 				}

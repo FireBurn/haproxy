@@ -4239,6 +4239,7 @@ int srvrq_resolution_error_cb(struct dns_requester *requester, int error_code)
 	for (s = srvrq->proxy->srv; s != NULL; s = s->next) {
 		HA_SPIN_LOCK(SERVER_LOCK, &s->lock);
 		if (s->srvrq == srvrq) {
+			dns_unlink_resolution(s->dns_requester);
 			snr_update_srv_status(s, 1);
 			free(s->hostname);
 			free(s->hostname_dn);
@@ -4247,7 +4248,6 @@ int srvrq_resolution_error_cb(struct dns_requester *requester, int error_code)
 			s->hostname_dn_len = 0;
 			memset(&s->addr, 0, sizeof(s->addr));
 			s->svc_port = 0;
-			dns_unlink_resolution(s->dns_requester);
 		}
 		HA_SPIN_UNLOCK(SERVER_LOCK, &s->lock);
 	}
