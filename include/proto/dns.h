@@ -44,7 +44,7 @@ int dns_get_ip_from_response(struct dns_response_packet *dns_p,
 
 void dns_purge_resolution_answer_records(struct dns_resolution *resolution);
 int dns_link_resolution(void *requester, int requester_type, int requester_locked);
-void dns_unlink_resolution(struct dns_requester *requester);
+void dns_unlink_resolution(struct dns_requester *requester, int safe);
 void dns_trigger_resolution(struct dns_requester *requester);
 enum act_parse_ret dns_parse_do_resolve(const char **args, int *orig_arg, struct proxy *px, struct act_rule *rule, char **err);
 int check_action_do_resolve(struct act_rule *rule, struct proxy *px, char **err);
