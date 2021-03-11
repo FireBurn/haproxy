@@ -60,6 +60,7 @@ struct server *cli_find_server(struct appctx *appctx, char *arg);
 struct server *new_server(struct proxy *proxy);
 
 /* functions related to server name resolution */
+int srvrq_update_srv_status(struct server *s, int has_no_ip);
 int snr_update_srv_status(struct server *s, int has_no_ip);
 const char *update_server_fqdn(struct server *server, const char *fqdn, const char *updater, int dns_locked);
 int snr_resolution_cb(struct dns_requester *requester, struct dns_nameserver *nameserver);
