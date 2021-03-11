@@ -520,7 +520,7 @@ static void dns_check_dns_response(struct dns_resolution *res)
 					    item->data_len == srv->hostname_dn_len &&
 					    !dns_hostname_cmp(srv->hostname_dn, item->target, item->data_len)) {
 						dns_unlink_resolution(srv->dns_requester);
-						snr_update_srv_status(srv, 1);
+						srvrq_update_srv_status(srv, 1);
 						free(srv->hostname);
 						free(srv->hostname_dn);
 						srv->hostname        = NULL;
