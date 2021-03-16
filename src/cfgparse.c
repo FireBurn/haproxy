@@ -122,6 +122,8 @@ struct list sections = LIST_HEAD_INIT(sections);
 
 struct list postparsers = LIST_HEAD_INIT(postparsers);
 
+extern struct proxy *mworker_proxy;
+
 char *cursection = NULL;
 struct proxy defproxy = { };		/* fake proxy used to assign default values on all instances */
 int cfg_maxpconn = 0;                   /* # of simultaneous connections per proxy (-N) */
@@ -163,7 +165,7 @@ int str2listener(char *str, struct proxy *curproxy, struct bind_conf *bind_conf,
 		}
 
 		ss2 = str2sa_range(str, NULL, &port, &end, err,
-		                   curproxy == global.stats_fe ? NULL : global.unix_bind.prefix,
+		                   (curproxy == global.stats_fe || curproxy == mworker_proxy) ? NULL : global.unix_bind.prefix,
 		                   NULL, 1);
 		if (!ss2)
 			goto fail;

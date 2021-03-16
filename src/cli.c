@@ -94,7 +94,7 @@ static struct cli_kw_list cli_keywords = {
 
 extern const char *stat_status_codes[];
 
-static struct proxy *mworker_proxy; /* CLI proxy of the master */
+struct proxy *mworker_proxy; /* CLI proxy of the master */
 
 static char *cli_gen_usage_msg(struct appctx *appctx)
 {
