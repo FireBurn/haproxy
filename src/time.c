@@ -16,6 +16,7 @@
 
 #include <common/config.h>
 #include <common/standard.h>
+#include <common/ticks.h>
 #include <common/time.h>
 #include <common/hathreads.h>
 
@@ -31,6 +32,7 @@ THREAD_LOCAL struct timeval after_poll;      /* system date after leaving poll()
 
 static THREAD_LOCAL struct timeval tv_offset;  /* per-thread time ofsset relative to global time */
 volatile unsigned long long global_now;      /* common date between all threads (32:32) */
+volatile unsigned int global_now_ms;         /* common date in milliseconds (may wrap) */
 
 static THREAD_LOCAL unsigned int iso_time_sec;     /* last iso time value for this thread */
 static THREAD_LOCAL char         iso_time_str[28]; /* ISO time representation of gettimeofday() */
@@ -179,6 +181,7 @@ REGPRM2 void tv_update_date(int max_wait, int interrupted)
 {
 	struct timeval adjusted, deadline, tmp_now, tmp_adj;
 	unsigned int   curr_sec_ms;     /* millisecond of current second (0..999) */
+	unsigned int old_now_ms, new_now_ms;
 	unsigned long long old_now;
 	unsigned long long new_now;
 
@@ -262,6 +265,15 @@ REGPRM2 void tv_update_date(int max_wait, int interrupted)
 	 */
 	ms_left_scaled = (999U - curr_sec_ms) * 4294967U;
 	now_ms = now.tv_sec * 1000 + curr_sec_ms;
+
+	/* update the global current millisecond */
+	old_now_ms = global_now_ms;
+	do {
+		new_now_ms = old_now_ms;
+		if (tick_is_lt(new_now_ms, now_ms))
+			new_now_ms = now_ms;
+	}  while (!_HA_ATOMIC_CAS(&global_now_ms, &old_now_ms, new_now_ms));
+
 	return;
 }
 
