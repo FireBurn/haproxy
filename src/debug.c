@@ -219,9 +219,9 @@ void ha_task_dump(struct buffer *buf, const struct task *task, const char *pfx)
 	}
 
 	if (hlua && hlua->T) {
-		luaL_traceback(hlua->T, hlua->T, NULL, 0);
-		if (!append_prefixed_str(buf, lua_tostring(hlua->T, -1), pfx, '\n', 1))
-			b_putchr(buf, '\n');
+		chunk_appendf(buf, "stack traceback:\n    ");
+		append_prefixed_str(buf, hlua_traceback(hlua->T, "\n    "), pfx, '\n', 0);
+		b_putchr(buf, '\n');
 	}
 	else
 		b_putchr(buf, '\n');
