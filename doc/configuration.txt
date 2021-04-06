@@ -6258,6 +6258,9 @@ option forwardfor [ except <network> ] [ header <name> ] [ if-none ]
   environment, as this might cause a security issue if headers reaching haproxy
   are under the control of the end-user.
 
+  Only IPv4 addresses are supported. "http-request add-header" or "http-request
+  set-header" rules may be used to work around this limitation.
+
   This option may be specified either in the frontend or in the backend. If at
   least one of them uses it, the header will be added. Note that the backend's
   setting of the header subargument takes precedence over the frontend's if
@@ -7027,6 +7030,9 @@ option originalto [ except <network> ] [ header <name> ]
   followed by the network address. In this case, any source IP matching the
   network will not cause an addition of this header. Most common uses are with
   private networks or 127.0.0.1.
+
+  Only IPv4 addresses are supported. "http-request add-header" or "http-request
+  set-header" rules may be used to work around this limitation.
 
   This option may be specified either in the frontend or in the backend. If at
   least one of them uses it, the header will be added. Note that the backend's
