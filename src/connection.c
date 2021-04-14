@@ -1436,6 +1436,8 @@ int make_proxy_line_v2(char *buf, int buf_len, struct server *srv, struct connec
 
 /* return the major HTTP version as 1 or 2 depending on how the request arrived
  * before being processed.
+ *
+ * WARNING: Should be updated if a new major HTTP version is added.
  */
 static int
 smp_fetch_fc_http_major(const struct arg *args, struct sample *smp, const char *kw, void *private)
@@ -1443,8 +1445,18 @@ smp_fetch_fc_http_major(const struct arg *args, struct sample *smp, const char *
 	struct connection *conn = (kw[0] != 'b') ? objt_conn(smp->sess->origin) :
 										smp->strm ? cs_conn(objt_cs(smp->strm->si[1].end)) : NULL;
 
+	/* No connection or a connection with a RAW muxx */
+	if (!conn || (conn->mux && !(conn->mux->flags & MX_FL_HTX)))
+		return 0;
+
+	/* No mux install, this may change */
+	if (!conn->mux) {
+		smp->flags |= SMP_F_MAY_CHANGE;
+		return 0;
+	}
+
 	smp->data.type = SMP_T_SINT;
-	smp->data.u.sint = (conn && strcmp(conn_get_mux_name(conn), "H2") == 0) ? 2 : 1;
+	smp->data.u.sint = (strcmp(conn_get_mux_name(conn), "H2") == 0) ? 2 : 1;
 	return 1;
 }
 
