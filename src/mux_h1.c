@@ -2223,6 +2223,8 @@ static int h1_process(struct h1c * h1c)
 			if (!h1s_create(h1c, NULL, NULL))
 				goto release;
 		}
+		else if (conn_is_back(conn) && (h1c->flags & H1C_F_CS_IDLE) && b_data(&h1c->ibuf))
+			goto release;
 		else
 			goto end;
 		h1s = h1c->h1s;
