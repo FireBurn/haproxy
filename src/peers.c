@@ -2769,9 +2769,6 @@ static struct task *process_peer_sync(struct task * task, void *context, unsigne
 				/* add DO NOT STOP flag if not present */
 				_HA_ATOMIC_ADD(&jobs, 1);
 				peers->flags |= PEERS_F_DONOTSTOP;
-				ps = peers->local;
-				for (st = ps->tables; st ; st = st->next)
-					st->table->syncing++;
 
 				/* disconnect all connected peers to process a local sync
 				 * this must be done only the first time we are switching
@@ -2797,7 +2794,7 @@ static struct task *process_peer_sync(struct task * task, void *context, unsigne
 				_HA_ATOMIC_SUB(&jobs, 1);
 				peers->flags &= ~PEERS_F_DONOTSTOP;
 				for (st = ps->tables; st ; st = st->next)
-					st->table->syncing--;
+					_HA_ATOMIC_SUB(&st->table->refcnt, 1);
 			}
 		}
 		else if (!ps->appctx) {
@@ -2823,7 +2820,7 @@ static struct task *process_peer_sync(struct task * task, void *context, unsigne
 					_HA_ATOMIC_SUB(&jobs, 1);
 					peers->flags &= ~PEERS_F_DONOTSTOP;
 					for (st = ps->tables; st ; st = st->next)
-						st->table->syncing--;
+						_HA_ATOMIC_SUB(&st->table->refcnt, 1);
 				}
 			}
 		}
@@ -3054,6 +3051,13 @@ void peers_register_table(struct peers *peers, struct stktable *table)
 			id = curpeer->tables->local_id;
 		st->local_id = id + 1;
 
+		/* If peer is local we inc table
+		 * refcnt to protect against flush
+		 * until this process pushed all
+		 * table content to the new one
+		 */
+		if (curpeer->local)
+			_HA_ATOMIC_ADD(&st->table->refcnt, 1);
 		curpeer->tables = st;
 	}
 
@@ -3220,8 +3224,8 @@ static int peers_dump_peer(struct buffer *msg, struct stream_interface *si, stru
 			              st->last_acked, st->last_pushed, st->last_get,
 			              st->teaching_origin, st->update);
 			chunk_appendf(&trash, "\n              table:%p id=%s update=%u localupdate=%u"
-			              " commitupdate=%u syncing=%u",
-			              t, t->id, t->update, t->localupdate, t->commitupdate, t->syncing);
+			              " commitupdate=%u refcnt=%u",
+			              t, t->id, t->update, t->localupdate, t->commitupdate, t->refcnt);
 			chunk_appendf(&trash, "\n        TX dictionary cache:");
 			count = 0;
 			for (i = 0; i < dcache->max_entries; i++) {
