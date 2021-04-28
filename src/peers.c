@@ -1814,7 +1814,7 @@ static inline int peer_treat_awaited_msg(struct appctx *appctx, struct peer *pee
 
 			/* prepare tables fot a global push */
 			for (st = peer->tables; st; st = st->next) {
-				st->teaching_origin = st->last_pushed = st->table->update;
+				st->teaching_origin = st->last_pushed = st->update;
 				st->flags = 0;
 			}
 
