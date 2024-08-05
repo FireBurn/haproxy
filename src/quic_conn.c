@@ -1708,15 +1708,18 @@ static int quic_stream_try_to_consume(struct quic_conn *qc,
 		struct quic_stream *strm;
 		struct quic_frame *frm;
 		size_t offset, len;
+		int fin;
 
 		strm = eb64_entry(frm_node, struct quic_stream, offset);
+		frm = container_of(strm, struct quic_frame, stream);
 		offset = strm->offset.key;
 		len = strm->len;
+		fin = frm->type & QUIC_STREAM_FRAME_TYPE_FIN_BIT;
 
 		if (offset > stream->ack_offset)
 			break;
 
-		if (qc_stream_desc_ack(&stream, offset, len)) {
+		if (qc_stream_desc_ack(&stream, offset, len, fin)) {
 			/* cf. next comment : frame may be freed at this stage. */
 			TRACE_DEVEL("stream consumed", QUIC_EV_CONN_ACKSTRM,
 			            qc, stream ? strm : NULL, stream);
@@ -1736,7 +1739,6 @@ static int quic_stream_try_to_consume(struct quic_conn *qc,
 		frm_node = eb64_next(frm_node);
 		eb64_delete(&strm->offset);
 
-		frm = container_of(strm, struct quic_frame, stream);
 		qc_release_frm(qc, frm);
 	}
 
@@ -1762,6 +1764,7 @@ static inline void qc_treat_acked_tx_frm(struct quic_conn *qc,
 		struct qc_stream_desc *stream = NULL;
 		const size_t offset = strm_frm->offset.key;
 		const size_t len = strm_frm->len;
+		const int fin = frm->type & QUIC_STREAM_FRAME_TYPE_FIN_BIT;
 
 		/* do not use strm_frm->stream as the qc_stream_desc instance
 		 * might be freed at this stage. Use the id to do a proper
@@ -1781,7 +1784,7 @@ static inline void qc_treat_acked_tx_frm(struct quic_conn *qc,
 
 		TRACE_DEVEL("acked stream", QUIC_EV_CONN_ACKSTRM, qc, strm_frm, stream);
 		if (offset <= stream->ack_offset) {
-			if (qc_stream_desc_ack(&stream, offset, len)) {
+			if (qc_stream_desc_ack(&stream, offset, len, fin)) {
 				stream_acked = 1;
 				TRACE_DEVEL("stream consumed", QUIC_EV_CONN_ACKSTRM,
 				            qc, strm_frm, stream);
