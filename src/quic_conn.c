@@ -2925,17 +2925,22 @@ static struct ncbuf *quic_get_ncbuf(struct ncbuf *ncbuf)
 	return ncbuf;
 }
 
-/* Parse <frm> CRYPTO frame coming with <pkt> packet at <qel> <qc> connectionn.
- * Returns 1 if succeeded, 0 if not. Also set <*fast_retrans> to 1 if the
- * speed up handshake completion may be run after having received duplicated
- * CRYPTO data.
+/* Parse <frm> CRYPTO frame coming with <pkt> packet at <qel> <qc> connection.
+ *
+ * Returns 0 on success or a negative error code. A positive value is used to
+ * indicate that the current frame cannot be handled immediately, but it could
+ * be solved by running a new packet parsing iteration.
+ *
+ * Also set <*fast_retrans> as output parameter to 1 if the speed up handshake
+ * completion may be run after having received duplicated CRYPTO data.
  */
-static int qc_handle_crypto_frm(struct quic_conn *qc,
-                                struct quic_crypto *frm, struct quic_rx_packet *pkt,
-                                struct quic_enc_level *qel, int *fast_retrans)
+static enum quic_rx_ret_frm qc_handle_crypto_frm(struct quic_conn *qc,
+                                                 struct quic_crypto *frm,
+                                                 struct quic_rx_packet *pkt,
+                                                 struct quic_enc_level *qel)
 {
-	int ret = 0;
 	enum ncb_ret ncb_ret;
+	enum quic_rx_ret_frm ret = QUIC_RX_RET_FRM_DONE;
 	/* XXX TO DO: <cfdebug> is used only for the traces. */
 	struct quic_rx_crypto_frm cfdebug = {
 		.offset_node.key = frm->offset,
@@ -2958,10 +2963,8 @@ static int qc_handle_crypto_frm(struct quic_conn *qc,
 		if (frm->offset + frm->len <= cstream->rx.offset) {
 			/* Nothing to do */
 			TRACE_PROTO("Already received CRYPTO data",
-						QUIC_EV_CONN_RXPKT, qc, pkt, &cfdebug);
-			if (qc_is_listener(qc) && qel == &qc->els[QUIC_TLS_ENC_LEVEL_INITIAL] &&
-				!(qc->flags & QUIC_FL_CONN_HANDSHAKE_SPEED_UP))
-				*fast_retrans = 1;
+				    QUIC_EV_CONN_RXPKT, qc, pkt, &cfdebug);
+			ret = QUIC_RX_RET_FRM_DUP;
 			goto done;
 		}
 
@@ -2978,7 +2981,7 @@ static int qc_handle_crypto_frm(struct quic_conn *qc,
 		if (!qc_provide_cdata(qel, qc->xprt_ctx, frm->data, frm->len,
 		                      pkt, &cfdebug)) {
 			// trace already emitted by function above
-			goto leave;
+			goto err;
 		}
 
 		cstream->rx.offset += frm->len;
@@ -2989,7 +2992,7 @@ static int qc_handle_crypto_frm(struct quic_conn *qc,
 	if (!quic_get_ncbuf(ncbuf) ||
 	    ncb_is_null(ncbuf)) {
 		TRACE_ERROR("CRYPTO ncbuf allocation failed", QUIC_EV_CONN_PRSHPKT, qc);
-		goto leave;
+		goto err;
 	}
 
 	/* frm->offset > cstream-trx.offset */
@@ -3006,7 +3009,7 @@ static int qc_handle_crypto_frm(struct quic_conn *qc,
 	if (off_rel + frm->len > ncb_size(ncbuf)) {
 		TRACE_ERROR("CRYPTO frame too large", QUIC_EV_CONN_PRSHPKT, qc);
 		quic_set_connection_close(qc, quic_err_transport(QC_ERR_CRYPTO_BUFFER_EXCEEDED));
-		goto leave;
+		goto err;
 	}
 
 	ncb_ret = ncb_add(ncbuf, off_rel, (const char *)frm->data,
@@ -3020,14 +3023,15 @@ static int qc_handle_crypto_frm(struct quic_conn *qc,
 			TRACE_ERROR("cannot bufferize frame due to gap size limit",
 			            QUIC_EV_CONN_PRSHPKT, qc);
 		}
-		goto leave;
+		goto err;
 	}
 
  done:
-	ret = 1;
- leave:
 	TRACE_LEAVE(QUIC_EV_CONN_PRSHPKT, qc);
 	return ret;
+ err:
+	TRACE_DEVEL("leaving on error", QUIC_EV_CONN_PRSHPKT, qc);
+	return QUIC_RX_RET_FRM_FATAL;
 }
 
 /* Parse all the frames of <pkt> QUIC packet for QUIC connection <qc> and <qel>
@@ -3039,6 +3043,7 @@ static int qc_parse_pkt_frms(struct quic_conn *qc, struct quic_rx_packet *pkt,
 {
 	struct quic_frame *frm = NULL;
 	const unsigned char *pos, *end;
+	enum quic_rx_ret_frm ret;
 	int fast_retrans = 0;
 
 	TRACE_ENTER(QUIC_EV_CONN_PRSHPKT, qc);
@@ -3114,8 +3119,20 @@ static int qc_parse_pkt_frms(struct quic_conn *qc, struct quic_rx_packet *pkt,
 			break;
 		}
 		case QUIC_FT_CRYPTO:
-			if (!qc_handle_crypto_frm(qc, &frm->crypto, pkt, qel, &fast_retrans))
+			ret = qc_handle_crypto_frm(qc, &frm->crypto, pkt, qel);
+			switch (ret) {
+			case QUIC_RX_RET_FRM_FATAL:
 				goto err;
+			case QUIC_RX_RET_FRM_DUP:
+				if (qc_is_listener(qc) && qel == &qc->els[QUIC_TLS_ENC_LEVEL_INITIAL] &&
+				    !(qc->flags & QUIC_FL_CONN_HANDSHAKE_SPEED_UP)) {
+					fast_retrans = 1;
+				}
+				break;
+			case QUIC_RX_RET_FRM_DONE:
+				/* nothing to do here */
+				break;
+			}
 			break;
 		case QUIC_FT_NEW_TOKEN:
 			if (qc_is_listener(qc)) {
