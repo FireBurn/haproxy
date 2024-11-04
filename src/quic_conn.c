@@ -3018,12 +3018,14 @@ static enum quic_rx_ret_frm qc_handle_crypto_frm(struct quic_conn *qc,
 		if (ncb_ret == NCB_RET_DATA_REJ) {
 			TRACE_ERROR("overlapping data rejected", QUIC_EV_CONN_PRSHPKT, qc);
 			quic_set_connection_close(qc, quic_err_transport(QC_ERR_PROTOCOL_VIOLATION));
+			goto err;
 		}
 		else if (ncb_ret == NCB_RET_GAP_SIZE) {
-			TRACE_ERROR("cannot bufferize frame due to gap size limit",
-			            QUIC_EV_CONN_PRSHPKT, qc);
+			TRACE_DATA("cannot bufferize frame due to gap size limit",
+				   QUIC_EV_CONN_PRSHPKT, qc);
+			ret = QUIC_RX_RET_FRM_AGAIN;
+			goto done;
 		}
-		goto err;
 	}
 
  done:
@@ -3041,10 +3043,13 @@ static enum quic_rx_ret_frm qc_handle_crypto_frm(struct quic_conn *qc,
 static int qc_parse_pkt_frms(struct quic_conn *qc, struct quic_rx_packet *pkt,
                              struct quic_enc_level *qel)
 {
-	struct quic_frame *frm = NULL;
+	struct list retry_frms = LIST_HEAD_INIT(retry_frms);
+	struct quic_frame *frm = NULL, *frm_tmp;
 	const unsigned char *pos, *end;
 	enum quic_rx_ret_frm ret;
 	int fast_retrans = 0;
+	/* parsing may be rerun multiple times, but no more than <iter>. */
+	int iter = 3, parsing_stage = 0;
 
 	TRACE_ENTER(QUIC_EV_CONN_PRSHPKT, qc);
 	/* Skip the AAD */
@@ -3123,6 +3128,17 @@ static int qc_parse_pkt_frms(struct quic_conn *qc, struct quic_rx_packet *pkt,
 			switch (ret) {
 			case QUIC_RX_RET_FRM_FATAL:
 				goto err;
+
+			case QUIC_RX_RET_FRM_AGAIN:
+				if (parsing_stage == 0) {
+					TRACE_STATE("parsing stage set to 1 (AGAIN encountered)", QUIC_EV_CONN_PRSHPKT, qc);
+					++parsing_stage;
+				}
+				/* Save frame in temp list to reparse it later. A new instance must be used for next packet frames. */
+				LIST_APPEND(&retry_frms, &frm->list);
+				frm = NULL;
+				break;
+
 			case QUIC_RX_RET_FRM_DUP:
 				if (qc_is_listener(qc) && qel == &qc->els[QUIC_TLS_ENC_LEVEL_INITIAL] &&
 				    !(qc->flags & QUIC_FL_CONN_HANDSHAKE_SPEED_UP)) {
@@ -3130,7 +3146,10 @@ static int qc_parse_pkt_frms(struct quic_conn *qc, struct quic_rx_packet *pkt,
 				}
 				break;
 			case QUIC_RX_RET_FRM_DONE:
-				/* nothing to do here */
+				if (parsing_stage == 1) {
+					TRACE_STATE("parsing stage set to 2 (DONE after AGAIN)", QUIC_EV_CONN_PRSHPKT, qc);
+					++parsing_stage;
+				}
 				break;
 			}
 			break;
@@ -3274,6 +3293,53 @@ static int qc_parse_pkt_frms(struct quic_conn *qc, struct quic_rx_packet *pkt,
 	if (frm)
 		pool_free(pool_head_quic_frame, frm);
 
+	while (!LIST_ISEMPTY(&retry_frms)) {
+		if (--iter <= 0) {
+			TRACE_ERROR("interrupt parsing due to max iteration reached",
+				    QUIC_EV_CONN_PRSHPKT, qc);
+			goto err;
+		}
+		else if (parsing_stage <= 1) {
+			TRACE_ERROR("interrupt parsing due to buffering blocked on gap size limit",
+				    QUIC_EV_CONN_PRSHPKT, qc);
+			goto err;
+		}
+
+		parsing_stage = 0;
+		list_for_each_entry_safe(frm, frm_tmp, &retry_frms, list) {
+			/* only CRYPTO frames may be reparsed for now */
+			BUG_ON(frm->type != QUIC_FT_CRYPTO);
+			ret = qc_handle_crypto_frm(qc, &frm->crypto, pkt, qel);
+			switch (ret) {
+			case QUIC_RX_RET_FRM_FATAL:
+				goto err;
+
+			case QUIC_RX_RET_FRM_AGAIN:
+				if (parsing_stage == 0) {
+					TRACE_STATE("parsing stage set to 1 (AGAIN encountered)", QUIC_EV_CONN_PRSHPKT, qc);
+					++parsing_stage;
+				}
+				break;
+
+			case QUIC_RX_RET_FRM_DONE:
+				TRACE_PROTO("frame handled after a new parsing iteration",
+					    QUIC_EV_CONN_PRSAFRM, qc, frm);
+				if (parsing_stage == 1) {
+					TRACE_STATE("parsing stage set to 2 (DONE after AGAIN)", QUIC_EV_CONN_PRSHPKT, qc);
+					++parsing_stage;
+				}
+				/* fall through */
+			case QUIC_RX_RET_FRM_DUP:
+				pool_free(pool_head_quic_frame, frm);
+				frm = NULL;
+				break;
+			}
+		}
+	}
+
+	/* Error should be returned if some frames cannot be parsed. */
+	BUG_ON(!LIST_ISEMPTY(&retry_frms));
+
 	if (fast_retrans) {
 		struct quic_enc_level *iqel = &qc->els[QUIC_TLS_ENC_LEVEL_INITIAL];
 		struct quic_enc_level *hqel = &qc->els[QUIC_TLS_ENC_LEVEL_HANDSHAKE];
@@ -3309,6 +3375,9 @@ static int qc_parse_pkt_frms(struct quic_conn *qc, struct quic_rx_packet *pkt,
  err:
 	if (frm)
 		pool_free(pool_head_quic_frame, frm);
+	list_for_each_entry_safe(frm, frm_tmp, &retry_frms, list) {
+		pool_free(pool_head_quic_frame, frm);
+	}
 
 	TRACE_DEVEL("leaving on error", QUIC_EV_CONN_PRSHPKT, qc);
 	return 0;
