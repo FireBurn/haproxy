@@ -3037,7 +3037,7 @@ static int qc_handle_crypto_frm(struct quic_conn *qc,
 static int qc_parse_pkt_frms(struct quic_conn *qc, struct quic_rx_packet *pkt,
                              struct quic_enc_level *qel)
 {
-	struct quic_frame frm;
+	struct quic_frame *frm = NULL;
 	const unsigned char *pos, *end;
 	int fast_retrans = 0;
 
@@ -3061,13 +3061,18 @@ static int qc_parse_pkt_frms(struct quic_conn *qc, struct quic_rx_packet *pkt,
 	}
 
 	while (pos < end) {
-		if (!qc_parse_frm(&frm, pkt, &pos, end, qc)) {
+		if (!frm && !(frm = pool_zalloc(pool_head_quic_frame))) {
+			TRACE_ERROR("cannot allocate frame", QUIC_EV_CONN_PRSHPKT, qc);
+			goto err;
+		}
+
+		if (!qc_parse_frm(frm, pkt, &pos, end, qc)) {
 			// trace already emitted by function above
 			goto err;
 		}
 
 		TRACE_PROTO("RX frame", QUIC_EV_CONN_PSTRM, qc, &frm);
-		switch (frm.type) {
+		switch (frm->type) {
 		case QUIC_FT_PADDING:
 			break;
 		case QUIC_FT_PING:
@@ -3077,7 +3082,7 @@ static int qc_parse_pkt_frms(struct quic_conn *qc, struct quic_rx_packet *pkt,
 			unsigned int rtt_sample;
 
 			rtt_sample = UINT_MAX;
-			if (!qc_parse_ack_frm(qc, &frm, qel, &rtt_sample, &pos, end)) {
+			if (!qc_parse_ack_frm(qc, frm, qel, &rtt_sample, &pos, end)) {
 				// trace already emitted by function above
 				goto err;
 			}
@@ -3087,8 +3092,8 @@ static int qc_parse_pkt_frms(struct quic_conn *qc, struct quic_rx_packet *pkt,
 
 				ack_delay = !quic_application_pktns(qel->pktns, qc) ? 0 :
 					qc->state >= QUIC_HS_ST_CONFIRMED ?
-					MS_TO_TICKS(QUIC_MIN(quic_ack_delay_ms(&frm.ack, qc), qc->max_ack_delay)) :
-					MS_TO_TICKS(quic_ack_delay_ms(&frm.ack, qc));
+					MS_TO_TICKS(QUIC_MIN(quic_ack_delay_ms(&frm->ack, qc), qc->max_ack_delay)) :
+					MS_TO_TICKS(quic_ack_delay_ms(&frm->ack, qc));
 				quic_loss_srtt_update(&qc->path->loss, rtt_sample, ack_delay, qc);
 			}
 			break;
@@ -3098,7 +3103,7 @@ static int qc_parse_pkt_frms(struct quic_conn *qc, struct quic_rx_packet *pkt,
 		    break;
 		case QUIC_FT_STOP_SENDING:
 		{
-			struct quic_stop_sending *stop_sending = &frm.stop_sending;
+			struct quic_stop_sending *stop_sending = &frm->stop_sending;
 			if (qc->mux_state == QC_MUX_READY) {
 				if (qcc_recv_stop_sending(qc->qcc, stop_sending->id,
 				                          stop_sending->app_error_code)) {
@@ -3109,7 +3114,7 @@ static int qc_parse_pkt_frms(struct quic_conn *qc, struct quic_rx_packet *pkt,
 			break;
 		}
 		case QUIC_FT_CRYPTO:
-			if (!qc_handle_crypto_frm(qc, &frm.crypto, pkt, qel, &fast_retrans))
+			if (!qc_handle_crypto_frm(qc, &frm->crypto, pkt, qel, &fast_retrans))
 				goto err;
 			break;
 		case QUIC_FT_NEW_TOKEN:
@@ -3131,7 +3136,7 @@ static int qc_parse_pkt_frms(struct quic_conn *qc, struct quic_rx_packet *pkt,
 			break;
 		case QUIC_FT_STREAM_8 ... QUIC_FT_STREAM_F:
 		{
-			struct quic_stream *stream = &frm.stream;
+			struct quic_stream *stream = &frm->stream;
 			unsigned nb_streams = qc->rx.strms[qcs_id_type(stream->id)].nb_streams;
 
 			/* The upper layer may not be allocated. */
@@ -3166,13 +3171,13 @@ static int qc_parse_pkt_frms(struct quic_conn *qc, struct quic_rx_packet *pkt,
 		}
 		case QUIC_FT_MAX_DATA:
 			if (qc->mux_state == QC_MUX_READY) {
-				struct quic_max_data *data = &frm.max_data;
+				struct quic_max_data *data = &frm->max_data;
 				qcc_recv_max_data(qc->qcc, data->max_data);
 			}
 			break;
 		case QUIC_FT_MAX_STREAM_DATA:
 			if (qc->mux_state == QC_MUX_READY) {
-				struct quic_max_stream_data *data = &frm.max_stream_data;
+				struct quic_max_stream_data *data = &frm->max_stream_data;
 				if (qcc_recv_max_stream_data(qc->qcc, data->id,
 				                              data->max_stream_data)) {
 					TRACE_ERROR("qcc_recv_max_stream_data() failed", QUIC_EV_CONN_PRSHPKT, qc);
@@ -3202,7 +3207,7 @@ static int qc_parse_pkt_frms(struct quic_conn *qc, struct quic_rx_packet *pkt,
 		case QUIC_FT_CONNECTION_CLOSE:
 		case QUIC_FT_CONNECTION_CLOSE_APP:
 			/* Increment the error counters */
-			qc_cc_err_count_inc(qc, &frm);
+			qc_cc_err_count_inc(qc, frm);
 			if (!(qc->flags & QUIC_FL_CONN_DRAINING)) {
 				if (!(qc->flags & QUIC_FL_CONN_HALF_OPEN_CNT_DECREMENTED)) {
 					qc->flags |= QUIC_FL_CONN_HALF_OPEN_CNT_DECREMENTED;
@@ -3249,6 +3254,9 @@ static int qc_parse_pkt_frms(struct quic_conn *qc, struct quic_rx_packet *pkt,
 	/* Flag this packet number space as having received a packet. */
 	qel->pktns->flags |= QUIC_FL_PKTNS_PKT_RECEIVED;
 
+	if (frm)
+		pool_free(pool_head_quic_frame, frm);
+
 	if (fast_retrans) {
 		struct quic_enc_level *iqel = &qc->els[QUIC_TLS_ENC_LEVEL_INITIAL];
 		struct quic_enc_level *hqel = &qc->els[QUIC_TLS_ENC_LEVEL_HANDSHAKE];
@@ -3282,6 +3290,9 @@ static int qc_parse_pkt_frms(struct quic_conn *qc, struct quic_rx_packet *pkt,
 	return 1;
 
  err:
+	if (frm)
+		pool_free(pool_head_quic_frame, frm);
+
 	TRACE_DEVEL("leaving on error", QUIC_EV_CONN_PRSHPKT, qc);
 	return 0;
 }
