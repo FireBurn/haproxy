@@ -2199,8 +2199,15 @@ void srv_settings_cpy(struct server *srv, const struct server *src, int srv_tmpl
 	srv->check.use_ssl            = src->check.use_ssl;
 	srv->check.port               = src->check.port;
 	srv->check.sni                = src->check.sni;
-	srv->check.alpn_str           = src->check.alpn_str;
-	srv->check.alpn_len           = src->check.alpn_len;
+	if (src->check.alpn_str) {
+		srv->check.alpn_str = malloc(src->check.alpn_len);
+		if (srv->check.alpn_str) {
+			memcpy(srv->check.alpn_str, src->check.alpn_str,
+			       src->check.alpn_len);
+			srv->check.alpn_len = src->check.alpn_len;
+		}
+	}
+
 	/* Note: 'flags' field has potentially been already initialized. */
 	srv->flags                   |= src->flags;
 	srv->do_check                 = src->do_check;

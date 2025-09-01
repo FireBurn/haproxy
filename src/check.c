@@ -1326,6 +1326,7 @@ const char *init_check(struct check *check, int type)
 
 void free_check(struct check *check)
 {
+	ha_free(&check->alpn_str);
 	task_destroy(check->task);
 	if (check->wait_list.tasklet)
 		tasklet_free(check->wait_list.tasklet);
