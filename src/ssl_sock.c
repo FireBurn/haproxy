@@ -1802,6 +1802,8 @@ static void ssl_sock_parse_clienthello(struct connection *conn, int write_p, int
 		capture = pool_alloc(pool_head_ssl_capture);
 	if (!capture)
 		return;
+
+	memset(capture, 0, sizeof(*capture));
 	/* Compute the xxh64 of the ciphersuite. */
 	capture->xxh64 = XXH64(msg, rec_len, 0);
 
