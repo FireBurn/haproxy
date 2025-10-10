@@ -616,6 +616,10 @@ ifneq ($(USE_BACKTRACE),)
 OPTIONS_LDFLAGS += -Wl,$(if $(EXPORT_SYMBOL),$(EXPORT_SYMBOL),--export-dynamic)
 endif
 
+ifneq ($(USE_MEMORY_PROFILING),)
+  MEMORY_PROFILING_CFLAGS  = -fno-optimize-sibling-calls
+endif
+
 ifneq ($(USE_CPU_AFFINITY),)
 OPTIONS_OBJS   += src/cpuset.o
 endif
