@@ -606,7 +606,8 @@ static void sc_app_shut(struct stconn *sc)
 		__fallthrough;
 	default:
 		sc->flags &= ~SC_FL_NOLINGER;
-		sc->flags |= SC_FL_ABRT_DONE;
+		if (!(sc->flags & (SC_FL_EOS|SC_FL_ABRT_DONE)))
+			sc->flags |= SC_FL_ABRT_DONE;
 		if (sc->flags & SC_FL_ISBACK)
 			__sc_strm(sc)->conn_exp = TICK_ETERNITY;
 	}
@@ -756,7 +757,8 @@ static void sc_app_shut_conn(struct stconn *sc)
 		__fallthrough;
 	default:
 		sc->flags &= ~SC_FL_NOLINGER;
-		sc->flags |= SC_FL_ABRT_DONE;
+		if (!(sc->flags & (SC_FL_EOS|SC_FL_ABRT_DONE)))
+			sc->flags |= SC_FL_ABRT_DONE;
 		if (sc->flags & SC_FL_ISBACK)
 			__sc_strm(sc)->conn_exp = TICK_ETERNITY;
 	}
@@ -931,7 +933,8 @@ static void sc_app_shut_applet(struct stconn *sc)
 		__fallthrough;
 	default:
 		sc->flags &= ~SC_FL_NOLINGER;
-		sc->flags |= SC_FL_ABRT_DONE;
+		if (!(sc->flags & (SC_FL_EOS|SC_FL_ABRT_DONE)))
+			sc->flags |= SC_FL_ABRT_DONE;
 		if (sc->flags & SC_FL_ISBACK)
 			__sc_strm(sc)->conn_exp = TICK_ETERNITY;
 	}
