@@ -4597,7 +4597,7 @@ void ssl_set_shctx(SSL_CTX *ctx)
 void SSL_CTX_keylog(const SSL *ssl, const char *line)
 {
 	struct ssl_keylog *keylog;
-	char *lastarg = NULL;
+	const char *lastarg = NULL;
 	char *dst = NULL;
 
 #ifdef USE_QUIC_OPENSSL_COMPAT
