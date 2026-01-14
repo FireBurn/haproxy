@@ -1939,6 +1939,8 @@ static enum act_parse_ret parse_http_set_map(const char **args, int *orig_arg, s
 	}
 	rule->action_ptr = http_action_set_map;
 	rule->release_ptr = release_http_map;
+	LIST_INIT(&rule->arg.map.key);
+	LIST_INIT(&rule->arg.map.value);
 
 	cur_arg = *orig_arg;
 	if (rule->action == 1 && (!*args[cur_arg] || !*args[cur_arg+1])) {
@@ -1974,7 +1976,6 @@ static enum act_parse_ret parse_http_set_map(const char **args, int *orig_arg, s
 	}
 
 	/* key pattern */
-	LIST_INIT(&rule->arg.map.key);
 	if (!parse_logformat_string(args[cur_arg], px, &rule->arg.map.key, LOG_OPT_HTTP, cap, err)) {
 		free(rule->arg.map.ref);
 		return ACT_RET_PRS_ERR;
@@ -1983,7 +1984,6 @@ static enum act_parse_ret parse_http_set_map(const char **args, int *orig_arg, s
 	if (rule->action == 1) {
 		/* value pattern for set-map only */
 		cur_arg++;
-		LIST_INIT(&rule->arg.map.value);
 		if (!parse_logformat_string(args[cur_arg], px, &rule->arg.map.value, LOG_OPT_HTTP, cap, err)) {
 			free(rule->arg.map.ref);
 			return ACT_RET_PRS_ERR;
