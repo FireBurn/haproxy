@@ -211,6 +211,12 @@ void free_proxy(struct proxy *p)
 	EXTRA_COUNTERS_FREE(p->extra_counters_fe);
 	EXTRA_COUNTERS_FREE(p->extra_counters_be);
 
+	list_for_each_entry_safe(rule, ruleb, &p->persist_rules, list) {
+		LIST_DELETE(&rule->list);
+		free_acl_cond(rule->cond);
+		free(rule);
+	}
+
 	list_for_each_entry_safe(acl, aclb, &p->acl, list) {
 		LIST_DELETE(&acl->list);
 		prune_acl(acl);
