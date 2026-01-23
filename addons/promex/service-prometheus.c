@@ -1028,7 +1028,7 @@ static int promex_dump_srv_metrics(struct appctx *appctx, struct htx *htx)
 				labels[1].value = ist2(sv->id, strlen(sv->id));
 
 				if (!stats_fill_sv_stats(px, sv, 0, stats, ST_F_TOTAL_FIELDS, &(ctx->field_num)))
-					return -1;
+					goto error;
 
 				if ((ctx->flags & PROMEX_FL_NO_MAINT_SRV) && (sv->cur_admin & SRV_ADMF_MAINT))
 					goto next_sv;
@@ -1146,7 +1146,6 @@ static int promex_dump_srv_metrics(struct appctx *appctx, struct htx *htx)
 		promex_set_ctx_sv(ctx, ctx->px ? ctx->px->srv : NULL);
 	}
 
-
   end:
 	if (out.len) {
 		if (!htx_add_data_atonce(htx, out))
@@ -1157,6 +1156,10 @@ static int promex_dump_srv_metrics(struct appctx *appctx, struct htx *htx)
   full:
 	ret = 0;
 	goto end;
+
+  error:
+	promex_set_ctx_sv(ctx, NULL);
+	return -1;
 }
 
 /* Dump stick table metrics (prefixed by "haproxy_sticktable_"). It returns 1 on success,
