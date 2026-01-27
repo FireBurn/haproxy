@@ -139,6 +139,10 @@ struct global_ssl global_ssl = {
 	.ocsp_update.delay_max = SSL_OCSP_UPDATE_DELAY_MAX,
 	.ocsp_update.delay_min = SSL_OCSP_UPDATE_DELAY_MIN,
 #endif
+#ifdef SSL_OP_NO_RX_CERTIFICATE_COMPRESSION
+	.certificate_compression = 1,
+#endif
+
 };
 
 static BIO_METHOD *ha_meth;
@@ -4280,6 +4284,11 @@ ssl_sock_initial_ctx(struct bind_conf *bind_conf)
 	options |= SSL_OP_NO_RENEGOTIATION;
 #endif
 
+#ifdef SSL_OP_NO_RX_CERTIFICATE_COMPRESSION
+	if (global_ssl.certificate_compression == 0)
+		options |= SSL_OP_NO_RX_CERTIFICATE_COMPRESSION | SSL_OP_NO_TX_CERTIFICATE_COMPRESSION;
+#endif
+
 	SSL_CTX_set_options(ctx, options);
 
 #ifdef SSL_MODE_ASYNC
@@ -5236,6 +5245,12 @@ static int ssl_sock_prepare_srv_ssl_ctx(const struct server *srv, SSL_CTX *ctx)
 
 	if (srv->ssl_ctx.options & SRV_SSL_O_NO_TLS_TICKETS)
 		options |= SSL_OP_NO_TICKET;
+
+#ifdef SSL_OP_NO_RX_CERTIFICATE_COMPRESSION
+	if (global_ssl.certificate_compression == 0)
+		options |= SSL_OP_NO_RX_CERTIFICATE_COMPRESSION | SSL_OP_NO_TX_CERTIFICATE_COMPRESSION;
+#endif
+
 	SSL_CTX_set_options(ctx, options);
 
 #ifdef SSL_MODE_ASYNC
