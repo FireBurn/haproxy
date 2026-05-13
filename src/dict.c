@@ -84,11 +84,12 @@ struct dict_entry *dict_insert(struct dict *d, char *s)
 
 	HA_RWLOCK_RDLOCK(DICT_LOCK, &d->rwlock);
 	de = __dict_lookup(d, s);
-	HA_RWLOCK_RDUNLOCK(DICT_LOCK, &d->rwlock);
 	if (de) {
 		HA_ATOMIC_INC(&de->refcount);
+		HA_RWLOCK_RDUNLOCK(DICT_LOCK, &d->rwlock);
 		return de;
 	}
+	HA_RWLOCK_RDUNLOCK(DICT_LOCK, &d->rwlock);
 
 	de = new_dict_entry(s);
 	if (!de)
