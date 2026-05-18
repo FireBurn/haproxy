@@ -1984,7 +1984,9 @@ static size_t h1_process_output(struct h1c *h1c, struct buffer *buf, size_t coun
 						goto skip_hdr;
 				}
 				else if (isteq(n, ist("upgrade"))) {
-					h1_parse_upgrade_header(h1m, v);
+					h1_parse_upgrade_header(h1m, &v);
+					if (!v.len)
+						goto skip_hdr;
 				}
 				else if ((isteq(n, ist("sec-websocket-accept")) &&
 				          h1m->flags & H1_MF_RESP) ||

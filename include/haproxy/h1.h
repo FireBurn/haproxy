@@ -96,8 +96,7 @@ enum h1m_state {
 #define H1_MF_METH_CONNECT      0x00002000 // Set for a response to a CONNECT request
 #define H1_MF_METH_HEAD         0x00004000 // Set for a response to a HEAD request
 #define H1_MF_UPG_WEBSOCKET     0x00008000 // Set for a Websocket upgrade handshake
-/* unused: 0x00010000, 0x00020000 */
-#define H1_MF_UPG_H2C           0x00040000 // "h2c" or "h2" used as upgrade token
+/* unused: 0x00010000, 0x00020000, 0x00040000 */
 
 /* Note: for a connection to be persistent, we need this for the request :
  *   - one of CLEN or CHNK
@@ -150,7 +149,7 @@ int h1_measure_trailers(const struct buffer *buf, unsigned int ofs, unsigned int
 int h1_parse_cont_len_header(struct h1m *h1m, struct ist *value);
 void h1_parse_xfer_enc_header(struct h1m *h1m, struct ist value);
 void h1_parse_connection_header(struct h1m *h1m, struct ist *value);
-void h1_parse_upgrade_header(struct h1m *h1m, struct ist value);
+void h1_parse_upgrade_header(struct h1m *h1m, struct ist *value);
 
 void h1_generate_random_ws_input_key(char key_out[25]);
 void h1_calculate_ws_output_key(const char *key, char *result);
