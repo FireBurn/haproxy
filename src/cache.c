@@ -235,7 +235,7 @@ static int secondary_key_cmp(const char *ref_key, const char *new_key)
  * Returns the cache_entry in case of success, NULL otherwise.
  */
 struct cache_entry *secondary_entry_exist(struct cache *cache, struct cache_entry *entry,
-					  const char *secondary_key)
+					  const char *primary_hash, const char *secondary_key)
 {
 	struct eb32_node *node = &entry->eb;
 
@@ -256,6 +256,12 @@ struct cache_entry *secondary_entry_exist(struct cache *cache, struct cache_entr
 
 		entry = node ? eb32_entry(node, struct cache_entry, eb) : NULL;
 	}
+
+	/* Now verify the full primary hash matches: eb32 only compares 32 bits so
+	 * we could have ended up on a different, unrelated entry.
+	 */
+	if (entry && primary_hash && memcmp(entry->hash, primary_hash, sizeof(entry->hash)))
+		entry = NULL;
 
 	/* Expired entry */
 	if (entry && entry->expire <= date.tv_sec) {
@@ -1106,7 +1112,7 @@ enum act_return http_action_store_cache(struct act_rule *rule, struct proxy *px,
 	if (old) {
 		if (vary_signature)
 			old = secondary_entry_exist(cconf->c.cache, old,
-						    txn->cache_secondary_hash);
+						    txn->cache_hash, txn->cache_secondary_hash);
 		if (old) {
 			if (!old->complete) {
 				/* An entry with the same primary key is already being
@@ -1807,7 +1813,8 @@ enum act_return http_action_req_cache_use(struct act_rule *rule, struct proxy *p
 			if (!http_request_build_secondary_key(s, res->secondary_key_signature)) {
 				shctx_lock(shctx_ptr(cache));
 				sec_entry = secondary_entry_exist(cache, res,
-								 s->txn->cache_secondary_hash);
+								  s->txn->cache_hash,
+								  s->txn->cache_secondary_hash);
 				if (sec_entry && sec_entry != res) {
 					/* The wrong row was added to the hot list. */
 					shctx_row_dec_hot(shctx_ptr(cache), entry_block);
