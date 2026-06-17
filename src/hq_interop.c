@@ -379,6 +379,10 @@ static void hq_interop_lclose(struct qcs *qcs, enum qcc_app_ops_lclose_mode mode
 	default:
 		qcc_reset_stream(qcs, 0);
 		break;
+
+	case QCC_APP_OPS_LCLO_MODE_READ:
+		qcc_abort_stream_read(qcs, 0);
+		break;
 	}
 }
 
