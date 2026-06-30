@@ -196,7 +196,7 @@ static struct qcs *qcs_new(struct qcc *qcc, uint64_t id, enum qcs_type type)
 	qcs->wait_event.events = 0;
 	qcs->subs = NULL;
 
-	qcs->err = 0;
+	qcs->rs_err = qcs->ss_err = 0;
 
 	/* Reset all timers and start base one. */
 	tot_time_reset(&qcs->timer.base);
@@ -1602,7 +1602,7 @@ void qcc_reset_stream(struct qcs *qcs, int err)
 
 	TRACE_STATE("reset stream", QMUX_EV_QCS_END, qcc->conn, qcs);
 	qcs->flags |= QC_SF_TO_RESET;
-	qcs->err = err;
+	qcs->rs_err = err;
 
 	/* On BE side, a QCS may be resetted before any data emission. */
 	if (conn_is_back(qcs->qcc->conn))
@@ -1658,7 +1658,7 @@ void qcc_send_stream(struct qcs *qcs, int urg, int count)
 }
 
 /* Prepare for the emission of STOP_SENDING on <qcs>. */
-void qcc_abort_stream_read(struct qcs *qcs)
+void qcc_abort_stream_read(struct qcs *qcs, int err)
 {
 	struct qcc *qcc = qcs->qcc;
 
@@ -1669,6 +1669,7 @@ void qcc_abort_stream_read(struct qcs *qcs)
 
 	TRACE_STATE("abort stream read", QMUX_EV_QCS_END, qcc->conn, qcs);
 	qcs->flags |= (QC_SF_TO_STOP_SENDING|QC_SF_READ_ABORTED);
+	qcs->ss_err = err;
 
 	_qcc_send_stream(qcs, 1);
 	tasklet_wakeup(qcc->wait_event.tasklet);
@@ -2559,7 +2560,7 @@ static int qcs_send_reset(struct qcs *qcs)
 	}
 
 	frm->reset_stream.id = qcs->id;
-	frm->reset_stream.app_error_code = qcs->err;
+	frm->reset_stream.app_error_code = qcs->rs_err;
 	frm->reset_stream.final_size = qcs->tx.fc.off_real;
 
 	LIST_APPEND(&frms, &frm->list);
@@ -2611,7 +2612,7 @@ static int qcs_send_stop_sending(struct qcs *qcs)
 	}
 
 	frm->stop_sending.id = qcs->id;
-	frm->stop_sending.app_error_code = qcs->err;
+	frm->stop_sending.app_error_code = qcs->ss_err;
 
 	LIST_APPEND(&frms, &frm->list);
 	if (qcc_send_frames(qcs->qcc, &frms, 0)) {
@@ -4487,8 +4488,9 @@ static int qmux_strm_show_sd(struct buffer *msg, struct sedesc *sd, const char *
 	if (!qcs)
 		return ret;
 
-	chunk_appendf(msg, " qcs=%p .flg=%#x .id=%llu .st=%s .ctx=%p, .err=%#llx",
-		      qcs, qcs->flags, (ull)qcs->id, qcs_st_to_str(qcs->st), qcs->ctx, (ull)qcs->err);
+	chunk_appendf(msg, " qcs=%p .flg=%#x .id=%llu .st=%s .ctx=%p, .err=%#llx/%#llx",
+		      qcs, qcs->flags, (ull)qcs->id, qcs_st_to_str(qcs->st), qcs->ctx,
+		      (ull)qcs->rs_err, (ull)qcs->ss_err);
 
 	if (pfx)
 		chunk_appendf(msg, "\n%s", pfx);
