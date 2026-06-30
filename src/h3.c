@@ -274,7 +274,7 @@ static ssize_t h3_init_uni_stream(struct h3c *h3c, struct qcs *qcs,
 		 * streams that have unknown or unsupported types.
 		 */
 		TRACE_STATE("abort reading on unknown uni stream type", H3_EV_H3S_NEW, qcs->qcc->conn, qcs);
-		qcc_abort_stream_read(qcs);
+		qcc_abort_stream_read(qcs, H3_ERR_NO_ERROR);
 		goto err;
 	}
 
@@ -1824,7 +1824,7 @@ static ssize_t h3_rcv_buf(struct qcs *qcs, struct buffer *b, int fin)
 
 		/* FIN received, ensure body length is conform to any content-length header. */
 		if ((h3s->flags & H3_SF_HAVE_CLEN) && h3_check_body_size(qcs, 1)) {
-			qcc_abort_stream_read(qcs);
+			qcc_abort_stream_read(qcs, h3s->err);
 			qcc_reset_stream(qcs, h3s->err, se_tevt_type_proto_err);
 			goto done;
 		}
@@ -2049,7 +2049,7 @@ static ssize_t h3_rcv_buf(struct qcs *qcs, struct buffer *b, int fin)
 		/* TODO Only unimplemented CONNECT reports H3_ERR_REQUEST_REJECTED here. */
 		const int tevt =
 		  (h3s->err == H3_ERR_REQUEST_REJECTED) ? 0 : se_tevt_type_proto_err;
-		qcc_abort_stream_read(qcs);
+		qcc_abort_stream_read(qcs, h3s->err);
 		qcc_reset_stream(qcs, h3s->err, tevt);
 		total += b_data(b);
 		goto done;
@@ -3026,8 +3026,7 @@ static size_t h3_snd_buf(struct qcs *qcs, struct buffer *buf, size_t count, char
 	        /* Generate a STOP_SENDING if full response transferred before
 	         * receiving the full request.
 	         */
-	        qcs->err = H3_ERR_NO_ERROR;
-	        qcc_abort_stream_read(qcs);
+	        qcc_abort_stream_read(qcs, H3_ERR_NO_ERROR);
 	}
 #endif
 
@@ -3253,7 +3252,7 @@ static int h3_attach(struct qcs *qcs, void *conn_ctx)
 		BUG_ON(quic_stream_is_local(qcs->qcc, qcs->id));
 
 		TRACE_STATE("close stream outside of GOAWAY range", H3_EV_H3S_NEW, qcs->qcc->conn, qcs);
-		qcc_abort_stream_read(qcs);
+		qcc_abort_stream_read(qcs, H3_ERR_REQUEST_REJECTED);
 		qcc_reset_stream(qcs, H3_ERR_REQUEST_REJECTED, 0);
 	}
 
