@@ -1,6 +1,17 @@
 ChangeLog :
 ===========
 
+2026/07/03 : 3.3.12
+    - BUG/MEDIUM: mux_quic: fix memory leak of rx app_buf on stream free
+    - BUG/MINOR: hq-interop: fix transcoding of wrapping response buffer
+    - BUG/MINOR: hq-interop: support transcoding of absolute URI
+    - BUG/MEDIUM: server: initialise agent.health in srv_settings_init()
+    - BUG/MINOR: sample: set SMP_F_CONST on srv_name fetch
+    - BUG/MEDIUM: servers: Use a refcount for port_range and free it properly
+    - BUG/MINOR: tools: fix invalid character detection in strl2ic()
+    - BUG/MAJOR: htx: Don't swap buffers for empty HTX message with an error
+    - BUG/MINOR: http-htx: Don't by-pass HTX API when merging cookie values
+
 2026/06/26 : 3.3.11
     - BUG/MEDIUM: dict: hold read lock while incrementing refcount in dict_insert
     - BUG/MEDIUM: http-client: Only consume input buffer when hc one is empty
