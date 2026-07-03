@@ -1,6 +1,14 @@
 ChangeLog :
 ===========
 
+2026/07/03 : 3.0.25
+    - BUG/MEDIUM: mux_quic: fix memory leak of rx app_buf on stream free
+    - BUG/MINOR: sample: set SMP_F_CONST on srv_name fetch
+    - BUG/MEDIUM: servers: Use a refcount for port_range and free it properly
+    - BUG/MINOR: tools: fix invalid character detection in strl2ic()
+    - BUG/MAJOR: htx: Don't swap buffers for empty HTX message with an error
+    - BUG/MINOR: http-htx: Don't by-pass HTX API when merging cookie values
+
 2026/06/26 : 3.0.24
     - BUG/MEDIUM: mux_quic: adjust qcc_is_dead() to account detached streams
     - BUG/MEDIUM: dict: hold read lock while incrementing refcount in dict_insert
