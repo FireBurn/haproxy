@@ -1,6 +1,31 @@
 ChangeLog :
 ===========
 
+2026/07/03 : 2.4.36
+    - BUG/MEDIUM: dict: hold read lock while incrementing refcount in dict_insert
+    - BUG/MINOR: backend: correct parameter value validation in get_server_ph_post()
+    - BUG/MEDIUM: dns: fix long loops in additional records parse on name failure
+    - BUG/MEDIUM: resolvers: fix name compression pointer validation in resolv_read_name()
+    - BUG/MINOR: dns: fix dangling dgram pointer on dns_dgram_init() failure path
+    - BUG/MEDIUM: h1: Skip all h2c values from Upgrade headers during parsing
+    - BUG/MINOR: h1: Don't mask websocket protocol if multiple protocols used
+    - BUG/MEDIUM: server: Duplicate healthcheck's alpn inherited from default server
+    - BUG/MINOR: hpack-tbl: add missing NULL check after hpack_dht_defrag()
+    - BUG/MEDIUM: mux-fcgi: fix uint16_t overflow in drl += drp
+    - BUG/MEDIUM: dict: hold lock while decrementing refcount in dict_entry_unref
+    - BUG/MEDIUM: hlua: Fix integer underflow when receiving line from lua cosocket
+    - BUG/MINOR: dict: fix refcount race on insert collision
+    - BUG/MEDIUM: cache: always verify the primary hash in get_secondary_entry()
+    - BUG/MINOR: payload: fix the handshake length bounds check smp_client_hello_parse()
+    - BUG/MEDIUM: auth: fix unconfigured password NULL deref
+    - BUG/MINOR: hlua: prevent Lua from passing CR/LF/NUL in HTTP headers
+    - BUG/MEDIUM: mux-fcgi: reject stream ID 0 for application records
+    - BUG/MINOR: mux-fcgi: Use relative offset to compute contig data in demux buf
+    - Revert "BUG/MEDIUM: dns: fix long loops in additional records parse on name failure"
+    - BUG/MINOR: cache: Fix copy of value when parsing maxage
+    - BUG/MEDIUM: mux-h1: Dup connection/upgrade value to parse it when making headers
+    - MINOR: version: set the EOL for the 2.4 branch
+
 2026/05/11 : 2.4.35
     - Revert "BUG/MEDIUM: cli: fix master CLI connection slot leak on client disconnect"
     - BUG/MEDIUM: stick-table: properly check permissions on CLI's set/clear cmd
