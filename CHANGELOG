@@ -1,6 +1,20 @@
 ChangeLog :
 ===========
 
+2026/07/03 : 3.4.2
+    - BUG/MEDIUM: mux_quic: fix memory leak of rx app_buf on stream free
+    - BUG/MINOR: hq-interop: fix transcoding of wrapping response buffer
+    - BUG/MINOR: hq-interop: support transcoding of absolute URI
+    - BUG/MEDIUM: server: initialise agent.health in srv_settings_init()
+    - BUG/MINOR: sample: set SMP_F_CONST on srv_name fetch
+    - BUG/MEDIUM: servers: Use a refcount for port_range and free it properly
+    - MINOR: hbuf: new lightweight hbuf API
+    - BUG/MINOR: init: fix default global settings being overwritten by -G
+    - BUG/MINOR: tools: fix invalid character detection in strl2ic()
+    - BUG/MAJOR: htx: Don't swap buffers for empty HTX message with an error
+    - BUG/MINOR: mux-quic: Fix handling EOM after in qcs_http_rcv_buf()
+    - BUG/MINOR: http-htx: Don't by-pass HTX API when merging cookie values
+
 2026/06/25 : 3.4.1
     - BUG/MEDIUM: check: Skip tcpcheck post-config for external checks
     - BUG/MEDIUM: check: Ignore small-buffer option when starting an external check
