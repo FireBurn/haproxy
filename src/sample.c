@@ -903,7 +903,7 @@ int smp_dup(struct sample *smp)
 
 	case SMP_T_STR:
 		buf = (smp->data.type == SMP_T_STR ? &smp->data.u.str : &smp->data.u.meth.str);
-		trash = get_trash_chunk_sz(buf->data+1);
+		trash = get_best_trash_chunk(buf, buf->data+1);
 		if (!trash)
 			return 0;
 		trash->data = buf->data;
@@ -1934,7 +1934,7 @@ static int sample_conv_base64url2bin(const struct arg *arg_p, struct sample *smp
 
 static int sample_conv_bin2base64(const struct arg *arg_p, struct sample *smp, void *private)
 {
-	struct buffer *trash = get_trash_chunk_sz((smp->data.u.str.data+2) * 4 / 3);
+	struct buffer *trash = get_best_trash_chunk(&smp->data.u.str, (smp->data.u.str.data+2) * 4 / 3);
 	int b64_len;
 
 	if (!trash)
@@ -1954,7 +1954,7 @@ static int sample_conv_bin2base64(const struct arg *arg_p, struct sample *smp, v
 
 static int sample_conv_bin2base64url(const struct arg *arg_p, struct sample *smp, void *private)
 {
-	struct buffer *trash = get_trash_chunk_sz((smp->data.u.str.data+2) * 4 / 3);
+	struct buffer *trash = get_best_trash_chunk(&smp->data.u.str, (smp->data.u.str.data+2) * 4 / 3);
 	int b64_len;
 
 	if (!trash)
@@ -2150,7 +2150,7 @@ static int sample_conv_be2hex_check(struct arg *args, struct sample_conv *conv,
  */
 static int sample_conv_be2hex(const struct arg *args, struct sample *smp, void *private)
 {
-	struct buffer *trash = get_trash_chunk_sz(smp->data.u.str.data * 2);
+	struct buffer *trash = get_best_trash_chunk(&smp->data.u.str, smp->data.u.str.size);
 	int chunk_size = args[1].data.sint;
 	const int last = args[2].data.sint ? smp->data.u.str.data - chunk_size + 1 : smp->data.u.str.data;
 	int i;
@@ -2182,15 +2182,6 @@ static int sample_conv_be2hex(const struct arg *args, struct sample *smp, void *
 			trash->area[trash->data++] = hextab[(c >> 4) & 0xF];
 			trash->area[trash->data++] = hextab[c & 0xF];
 		}
-
-		if (trash->data >= max_size) {
-			struct buffer *trash2 = get_larger_trash_chunk(trash);
-
-			if (!trash2)
-				break;
-			max_size += trash2->size - trash->size;
-			trash = trash2;
-		}
 	}
 
 	smp->data.u.str = *trash;
@@ -2201,7 +2192,7 @@ static int sample_conv_be2hex(const struct arg *args, struct sample *smp, void *
 
 static int sample_conv_bin2hex(const struct arg *arg_p, struct sample *smp, void *private)
 {
-	struct buffer *trash = get_trash_chunk_sz(smp->data.u.str.data*2);
+	struct buffer *trash = get_best_trash_chunk(&smp->data.u.str, smp->data.u.str.data*2);
 	unsigned char c;
 	int ptr = 0;
 
@@ -2221,7 +2212,7 @@ static int sample_conv_bin2hex(const struct arg *arg_p, struct sample *smp, void
 
 static int sample_conv_bin2base2(const struct arg *arg_p, struct sample *smp, void *private)
 {
-	struct buffer *trash = get_trash_chunk_sz(smp->data.u.str.data);
+	struct buffer *trash = get_best_trash_chunk(&smp->data.u.str, smp->data.u.str.data*8);
 	unsigned char c;
 	int ptr = 0;
 	int bit = 0;
@@ -2233,14 +2224,6 @@ static int sample_conv_bin2base2(const struct arg *arg_p, struct sample *smp, vo
 		c = smp->data.u.str.area[ptr++];
                 for (bit = 7; bit >= 0; bit--)
                         trash->area[trash->data++] = c & (1 << bit) ? '1' : '0';
-
-		if (trash->data >= trash->size - 8) {
-			struct buffer *trash2 = get_larger_trash_chunk(trash);
-
-			if (!trash2)
-				break;
-			trash = trash2;
-		}
 	}
 	smp->data.u.str = *trash;
 	smp->data.type = SMP_T_STR;
@@ -2321,7 +2304,7 @@ static int sample_conv_reverse(const struct arg *arg_p, struct sample *smp, void
 	int input_len = smp->data.u.str.data;
 	int i;
 
-	trash = get_trash_chunk_sz(input_len + 1);
+	trash = get_best_trash_chunk(&smp->data.u.str, input_len+1);
 	if (!trash)
 		return 0;
 
@@ -2361,7 +2344,7 @@ static int sample_conv_reverse_dom(const struct arg *arg_p, struct sample *smp, 
 	if (input[0] == '.')
 		return 0;
 
-	trash = get_trash_chunk_sz(input_len + 1);
+	trash = get_best_trash_chunk(&smp->data.u.str, input_len+1);
 	if (!trash)
 		return 0;
 
@@ -2856,7 +2839,9 @@ static int sample_conv_json(const struct arg *arg_p, struct sample *smp, void *p
 
 	input_type = arg_p->data.sint;
 
-	temp = get_trash_chunk();
+	temp = get_best_trash_chunk(&smp->data.u.str, smp->data.u.str.size);
+	if (!temp)
+		return 0;
 	temp->data = 0;
 
 	p = smp->data.u.str.area;
@@ -2941,11 +2926,8 @@ static int sample_conv_json(const struct arg *arg_p, struct sample *smp, void *p
 		}
 
 		/* Check length */
-		if (temp->data + len > temp->size) {
-			temp = get_larger_trash_chunk(temp);
-			if (!temp)
-				return 0;
-		}
+		if (temp->data + len > temp->size)
+			return 0;
 
 		/* Copy string. */
 		memcpy(temp->area + temp->data, str, len);
@@ -3335,7 +3317,6 @@ static int sample_conv_regsub(const struct arg *arg_p, struct sample *smp, void 
 	struct my_regex *reg = arg_p[0].data.reg;
 	regmatch_t pmatch[MAX_MATCH];
 	struct buffer *trash = get_trash_chunk_sz(smp->data.u.str.data);
-	struct buffer *tmp;
 	struct buffer *output;
 	int flag, max;
 	int found;
@@ -3358,13 +3339,6 @@ static int sample_conv_regsub(const struct arg *arg_p, struct sample *smp, void 
 
 		if (!found)
 			pmatch[0].rm_so = end - start;
-
-		/* If too many data to copy try to get a larger chunk */
-		if (pmatch[0].rm_so > b_room(trash)) {
-			tmp = get_larger_trash_chunk(trash);
-			if (tmp)
-				trash = tmp;
-		}
 
 		/* copy the heading non-matching part (which may also be the tail if nothing matches) */
 		max = trash->size - trash->data;
@@ -3389,13 +3363,6 @@ static int sample_conv_regsub(const struct arg *arg_p, struct sample *smp, void 
 		}
 		output->data = max;
 
-		/* If too many data to copy try to get a larger chunk */
-		if (output->data > b_room(trash)) {
-			tmp = get_larger_trash_chunk(trash);
-			if (tmp)
-				trash = tmp;
-		}
-
 		/* replace the matching part */
 		max = trash->size - trash->data;
 		if (max) {
@@ -3411,13 +3378,6 @@ static int sample_conv_regsub(const struct arg *arg_p, struct sample *smp, void 
 		/* stop here if we're done with this string */
 		if (start >= end)
 			break;
-
-		/* If too many data to copy try to get a larger chunk */
-		if (!b_room(trash)) {
-			tmp = get_larger_trash_chunk(trash);
-			if (tmp)
-				trash = tmp;
-		}
 
 		/* We have a special case for matches of length 0 (eg: "x*y*").
 		 * These ones are considered to match in front of a character,
@@ -3788,7 +3748,8 @@ static int sample_conv_concat(const struct arg *arg_p, struct sample *smp, void 
 		var = ist2(b_orig(&tmp.data.u.str), b_data(&tmp.data.u.str));
 	}
 
-	trash = alloc_trash_chunk_sz(smp->data.u.str.data + arg_p[0].data.str.data + istlen(var) + arg_p[2].data.str.data);
+	trash = alloc_best_trash_chunk(&smp->data.u.str,
+				       smp->data.u.str.data + arg_p[0].data.str.data + istlen(var) + arg_p[2].data.str.data);
 	if (!trash)
 		return 0;
 
@@ -3872,7 +3833,8 @@ static int sample_conv_add_item(const struct arg *arg_p, struct sample *smp, voi
 		var = ist2(b_orig(&tmp.data.u.str), b_data(&tmp.data.u.str));
 	}
 
-	tmpbuf = alloc_trash_chunk_sz(smp->data.u.str.data + arg_p[0].data.str.data + istlen(var) + arg_p[2].data.str.data);
+	tmpbuf = alloc_best_trash_chunk(&smp->data.u.str,
+					smp->data.u.str.data + arg_p[0].data.str.data + istlen(var) + arg_p[2].data.str.data);
 	if (!tmpbuf)
 		return 0;
 
@@ -4604,7 +4566,6 @@ static int sample_check_json_query(struct arg *arg, struct sample_conv *conv,
  */
 static int sample_conv_json_query(const struct arg *args, struct sample *smp, void *private)
 {
-	struct buffer *trash = get_trash_chunk();
 	const char *token; /* holds the temporary string from mjson_find */
 	int token_size;    /* holds the length of <token> */
 
@@ -4624,6 +4585,7 @@ static int sample_conv_json_query(const struct arg *args, struct sample *smp, vo
 
 				return 1;
 			} else {
+				struct buffer *trash = get_trash_chunk();
 				double double_val;
 
 				if (mjson_get_number(smp->data.u.str.area, smp->data.u.str.data, args[0].data.str.area, &double_val) == 0)
@@ -4646,16 +4608,14 @@ static int sample_conv_json_query(const struct arg *args, struct sample *smp, vo
 
 			return 1;
 		case MJSON_TOK_STRING: {
+			struct buffer *trash = get_trash_chunk_sz(token_size);
 			int len;
 
-		retry:
+			if (!trash)
+				return 0;
 			len = mjson_get_string(smp->data.u.str.area, smp->data.u.str.data, args[0].data.str.area, trash->area, trash->size);
 
 			if (len == -1) {
-				trash = get_larger_trash_chunk(trash);
-				if (trash)
-					goto retry;
-
 				/* invalid string */
 				return 0;
 			}
@@ -4667,13 +4627,12 @@ static int sample_conv_json_query(const struct arg *args, struct sample *smp, vo
 			return 1;
 		}
                case MJSON_TOK_ARRAY: {
+		       struct buffer *trash = get_trash_chunk_sz(token_size);
+
+			if (!trash)
+				return 0;
                        // We copy the complete array, including square brackets into the return buffer
                        // result looks like: ["manage-account","manage-account-links","view-profile"]
-		       if (token_size > trash->size) {
-			       trash = get_larger_trash_chunk(trash);
-			       if (!trash)
-				       return 0;
-		       }
                        trash->data = b_putblk(trash, token, token_size);
                        smp->data.u.str = *trash;
                        smp->data.type = SMP_T_STR;
