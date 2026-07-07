@@ -1150,11 +1150,15 @@ static int process_switching_rules(struct stream *s, struct channel *req, int an
 	/* Se the max connection retries for the stream. may be overwritten later */
 	s->max_retries = s->be->conn_retries;
 
-	/* we don't want to run the TCP or HTTP filters again if the backend has not changed */
 	if (fe == s->be) {
+		/* we don't want to run the TCP or HTTP filters again if the backend has not changed */
 		s->req.analysers &= ~AN_REQ_INSPECT_BE;
 		s->req.analysers &= ~AN_REQ_HTTP_PROCESS_BE;
 		s->req.analysers &= ~AN_REQ_FLT_START_BE;
+	}
+	else {
+		s->scb->ioto = TICK_ETERNITY;
+		s->tunnel_timeout = TICK_ETERNITY;
 	}
 
 	/* as soon as we know the backend, we must check if we have a matching forced or ignored
