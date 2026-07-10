@@ -33,6 +33,9 @@ struct buffer;
 struct proxy;
 struct appctx;
 struct htx;
+struct uri_auth;
+struct proxy;
+
 
 /* These two structs contains all field names and descriptions according to
  * the the number of entries in "enum stat_field" and "enum info_field"
@@ -134,6 +137,9 @@ int stats_allocate_proxy_counters_internal(struct extra_counters **counters,
 int stats_allocate_proxy_counters(struct proxy *px);
 
 void stats_register_module(struct stats_module *m);
+
+int stats_proxy_in_scope(const struct proxy *px, const struct uri_auth *uri,
+			 const struct proxy *http_px);
 
 #endif /* _HAPROXY_STATS_H */
 
