@@ -3755,6 +3755,7 @@ static size_t h1_snd_buf(struct stconn *sc, struct buffer *buf, size_t count, in
 {
 	struct h1s *h1s = __sc_mux_strm(sc);
 	struct h1c *h1c;
+	struct h1m *h1m;
 	size_t total = 0;
 
 	if (!h1s)
@@ -3785,6 +3786,7 @@ static size_t h1_snd_buf(struct stconn *sc, struct buffer *buf, size_t count, in
 	if (flags & CO_SFL_STREAMER)
 		h1c->flags |= H1C_F_CO_STREAMER;
 
+	h1m = (!(h1c->flags & H1C_F_IS_BACK) ? &h1s->res : &h1s->req);
 	while (count) {
 		size_t ret = 0;
 
@@ -3798,6 +3800,13 @@ static size_t h1_snd_buf(struct stconn *sc, struct buffer *buf, size_t count, in
 
 		if ((count - ret) > 0)
 			h1c->flags |= H1C_F_CO_MSG_MORE;
+		else {
+			/* Remove H1C_F_CO_MSG_MORE if a content-length was set and all the payload was sent.
+			 * At worst, it remains trailers from H2/QUIC messages that will be dropped.
+			 */
+			if ((h1m->flags & H1_MF_CLEN) && !h1m->curr_len)
+				h1c->flags &= ~H1C_F_CO_MSG_MORE;
+		}
 
 		total += ret;
 		count -= ret;
@@ -3865,6 +3874,11 @@ static int h1_rcv_pipe(struct stconn *sc, struct pipe *pipe, unsigned int count)
 			if (!h1m->curr_len) {
 				h1m->state = H1_MSG_DONE;
 				h1c->flags &= ~H1C_F_WANT_SPLICE;
+
+				/* Remove H1C_F_CO_MSG_MORE if a content-length was set and all the payload was sent.
+				 * At worst, it remains trailers from H2/QUIC messages that will be dropped.
+				 */
+				h1c->flags &= ~H1C_F_CO_MSG_MORE;
 				TRACE_STATE("payload fully received", H1_EV_STRM_RECV, h1c->conn, h1s);
 			}
 		}
