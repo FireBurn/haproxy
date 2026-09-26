@@ -2962,7 +2962,7 @@ static int cli_acme_chall_ready_parse(char **args, char *payload, struct appctx 
 		ctx = ebmb_entry(node, struct acme_ctx, node);
 		auth = ctx->auths;
 		while (auth) {
-			if (strncmp(dns, auth->dns.ptr, auth->dns.len) == 0) {
+			if (isteq(ist(dns), auth->dns)) {
 				if (!auth->ready) {
 					auth->ready = 1;
 					found++;
