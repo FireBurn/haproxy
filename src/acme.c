@@ -3551,7 +3551,7 @@ static int cli_acme_chall_ready_parse(char **args, char *payload, struct appctx 
 		if (ctx->cfg->cond_ready & ACME_RDY_CLI)
 			auth = ctx->auths;
 		while (auth) {
-			if (strncmp(dns, auth->dns.ptr, auth->dns.len) == 0) {
+			if (isteq(ist(dns), auth->dns)) {
 				if (!(auth->ready & ACME_RDY_CLI)) {
 					auth->ready |= ACME_RDY_CLI;
 					found++;
