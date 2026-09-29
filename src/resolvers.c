@@ -2944,6 +2944,8 @@ static int cli_io_handler_dump_resolvers_to_buffer(struct appctx *appctx)
 			}
 
 			list_for_each_entry_from(ns, &resolvers->nameservers, list) {
+				/* restart from this one if the buffer is full */
+				ctx->ns = ns;
 				chunk_reset(&trash);
 				chunk_appendf(&trash, " nameserver %s:\n", ns->id);
 				chunk_appendf(&trash, "  sent:        %lld\n", ns->counters->sent);
@@ -2963,7 +2965,6 @@ static int cli_io_handler_dump_resolvers_to_buffer(struct appctx *appctx)
 				chunk_appendf(&trash, "  outdated:    %lld\n",  ns->counters->app.resolver.outdated);
 				if (applet_putchk(appctx, &trash) == -1)
 					goto full;
-				ctx->ns = ns;
 			}
 
 			ctx->ns = NULL;
