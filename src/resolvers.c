@@ -1405,6 +1405,8 @@ static int resolv_validate_dns_response(unsigned char *resp, unsigned char *bufe
 				break;
 
 			default:
+				/* ignored record, skip its data */
+				reader += answer_record->data_len;
 				pool_free(resolv_answer_item_pool, answer_record);
 				answer_record = NULL;
 				continue;
