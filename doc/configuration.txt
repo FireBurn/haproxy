@@ -18721,8 +18721,11 @@ nameserver <name> <address>[:port] [param*]
   Used to configure a nameserver. <name> of the nameserver should ne unique.
   By default the <address> is considered of type datagram. This means if an
   IPv4 or IPv6 is configured without special address prefixes (paragraph 11.)
-  the UDP protocol will be used.  If an stream protocol address prefix is used,
+  the UDP protocol will be used. If an stream protocol address prefix is used,
   the nameserver will be considered as a stream server (TCP for instance) and
+  the [param*] arguments are supported. For a datagram nameserver, any
+  argument following the address is ignored and a warning is emitted during
+  the configuration parsing.
   "server" parameters found in 5.2 paragraph which are relevant for DNS
   resolving will be considered.  Note: currently, in TCP mode, 4 queries are
   pipelined on the same connections. A batch of idle connections are removed
