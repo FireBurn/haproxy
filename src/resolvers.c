@@ -2391,6 +2391,16 @@ static struct task *process_resolvers(struct task *t, void *context, unsigned in
 		if (!tick_is_expired(exp, now_ms))
 			break;
 
+		/* When no nameserver responded, they all timed out. Otherwise
+		 * we don't know which ones did not respond.
+		 */
+		if (!res->nb_responses) {
+			struct dns_nameserver *ns;
+
+			list_for_each_entry(ns, &resolvers->nameservers, list)
+				ns->counters->app.resolver.timeout++;
+		}
+
 		/* If current resolution has been tried too many times and
 		 * finishes in timeout we update its status and remove it from
 		 * the list */
