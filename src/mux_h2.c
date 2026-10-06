@@ -936,6 +936,12 @@ static inline struct buffer *h2_get_buf(struct h2c *h2c, struct buffer *bptr)
 {
 	struct buffer *buf = NULL;
 
+	/* an already allocated buffer must always be returned, even while
+	 * waiting for another one to be allocated.
+	 */
+	if (b_size(bptr))
+		return bptr;
+
 	if (likely(!LIST_INLIST(&h2c->buf_wait.list)) &&
 	    unlikely((buf = b_alloc(bptr)) == NULL)) {
 		h2c->buf_wait.target = h2c;
