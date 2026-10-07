@@ -3445,10 +3445,17 @@ static void h1_detach(struct sedesc *sd)
 	sess = h1s->sess;
 	h1c = h1s->h1c;
 
-	sess->accept_date = date;
-	sess->tv_accept   = now;
-	sess->t_handshake = 0;
-	sess->t_idle      = -1;
+	/* Prepare the timing information for the next request on a frontend
+	 * connection. On the backend side, <sess> is the client's session,
+	 * which may be shared by several streams (H2/H3), it must not be
+	 * touched.
+	 */
+	if (!(h1c->flags & H1C_F_IS_BACK)) {
+		sess->accept_date = date;
+		sess->tv_accept   = now;
+		sess->t_handshake = 0;
+		sess->t_idle      = -1;
+	}
 
 	is_not_first = h1s->flags & H1S_F_NOT_FIRST;
 	h1s_destroy(h1s);
