@@ -156,6 +156,7 @@ static int h1_postparse_req_hdrs(struct h1m *h1m, union h1_sl *h1sl, struct htx 
 	struct htx_sl *sl;
 	struct ist meth, uri, vsn;
 	unsigned int flags = 0;
+	int lenient;
 
 	/* <h1sl> is always defined for a request */
 	meth = h1sl->rq.m;
@@ -246,8 +247,11 @@ static int h1_postparse_req_hdrs(struct h1m *h1m, union h1_sl *h1sl, struct htx 
 	 * corresponding flags must be preserved for the next parsing.
 	 */
 	flags = h1m->flags & (H1_MF_CONN_CLO|H1_MF_CONN_KAL);
+	lenient = (h1m->err_pos >= -1);
 	h1m_init_req(h1m);
 	h1m->flags |= (H1_MF_NO_PHDR|H1_MF_CLEAN_CONN_HDR|flags);
+	if (lenient)
+		h1m->err_pos = -1; /* keep accepting unsafe violations */
 	return -2;
   error:
 	h1m->err_pos = h1m->next;
@@ -268,6 +272,7 @@ static int h1_postparse_res_hdrs(struct h1m *h1m, union h1_sl *h1sl, struct htx 
 	struct ist vsn, status, reason;
 	unsigned int flags = 0;
 	uint16_t code = 0;
+	int lenient;
 
 	if (h1sl) {
 		/* For HTTP responses, the start-line was parsed */
@@ -371,8 +376,11 @@ static int h1_postparse_res_hdrs(struct h1m *h1m, union h1_sl *h1sl, struct htx 
 	 * corresponding flags must be preserved for the next parsing.
 	 */
 	flags = h1m->flags & (H1_MF_CONN_CLO|H1_MF_CONN_KAL);
+	lenient = (h1m->err_pos >= -1);
 	h1m_init_res(h1m);
 	h1m->flags |= (H1_MF_NO_PHDR|H1_MF_CLEAN_CONN_HDR|flags);
+	if (lenient)
+		h1m->err_pos = -1; /* keep accepting unsafe violations */
 	return -2;
   error:
 	h1m->err_pos = h1m->next;
