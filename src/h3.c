@@ -1686,7 +1686,7 @@ static ssize_t h3_data_to_htx(struct qcs *qcs, const struct buffer *buf,
 		goto retry;
 	}
 
-	ret = htx_add_data(htx, ist2(head, len));
+	htx_sent += ret = htx_add_data(htx, ist2(head, len));
 	if (ret < len) {
 		qcs->flags |= QC_SF_DEM_FULL;
 		goto out;
@@ -1694,7 +1694,6 @@ static ssize_t h3_data_to_htx(struct qcs *qcs, const struct buffer *buf,
 
 	if (fin && len == ret)
 		htx->flags |= HTX_FL_EOM;
-	htx_sent += ret;
 
  out:
 	if (appbuf)
