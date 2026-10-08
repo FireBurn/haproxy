@@ -321,9 +321,32 @@ static void spoe_release_agent(struct spoe_agent *agent)
 	}
 	free(agent->events);
 	free(agent->engine_id);
-	if (agent->fe.id)
-		deinit_proxy(&agent->fe);
+
+	proxy_drop(agent->fe);
 	free(agent);
+}
+
+/* Takes a reference on the SPOE agent <agent>.
+ */
+static inline void spoe_agent_take(struct spoe_agent *agent)
+{
+	_HA_ATOMIC_INC(&agent->refcount);
+}
+
+/* Drops a reference on the SPOE agent <agent>, releasing it when it was the
+ * last one. The agent is owned by its filter configuration, which drops its
+ * reference during its deinitialization, and its applets hold one reference
+ * each, dropped when their applet context is destroyed. So the agent is
+ * released once its filter configuration is destroyed and the applet contexts
+ * of all its applets were destroyed, hence after the teardown of their streams
+ * completed.
+ */
+static void spoe_agent_drop(struct spoe_agent *agent)
+{
+	if (_HA_ATOMIC_SUB_FETCH(&agent->refcount, 1) != 0)
+		return;
+
+	spoe_release_agent(agent);
 }
 
 static const char *spoe_event_str[SPOE_EV_EVENTS] = {
@@ -381,7 +404,7 @@ static int spoe_init_appctx(struct appctx *appctx)
 	struct spoe_agent *agent = spoe_appctx->agent;
 	struct stream *s;
 
-	if (appctx_finalize_startup(appctx, &agent->fe, &spoe_appctx->spoe_ctx->buffer) == -1)
+	if (appctx_finalize_startup(appctx, agent->fe, &spoe_appctx->spoe_ctx->buffer) == -1)
 		goto error;
 
 	spoe_appctx->owner = appctx;
@@ -428,7 +451,10 @@ static void spoe_release_appctx(struct appctx *appctx)
 	if (spoe_appctx == NULL)
 		return;
 
- 	appctx->svcctx = NULL;
+	/* the SPOE applet context is kept in svcctx until the applet context is
+	 * destroyed (see spoe_destroy_appctx()), to drop the reference on the
+	 * agent after the teardown of the applet stream completed.
+	 */
 	appctx_strm(appctx)->parent = NULL;
 
 	/* Shutdown the server connection, if needed */
@@ -448,9 +474,23 @@ static void spoe_release_appctx(struct appctx *appctx)
 		}
 		task_wakeup(spoe_appctx->spoe_ctx->strm->task, TASK_WOKEN_MSG);
 	}
+}
 
-  end:
-	/* Release allocated memory */
+/* Callback function called when a SPOE applet context is destroyed, from
+ * __appctx_free(). This is the last user of the applet context: it happens
+ * during the teardown of the applet stream (from sc_destroy(), inside
+ * stream_free()). So the stream cannot reference the agent internal frontend
+ * anymore. Drop the applet reference on the agent, taken when the applet was
+ * created, and release the SPOE applet context.
+ */
+static void spoe_destroy_appctx(struct appctx *appctx)
+{
+	struct spoe_appctx *spoe_appctx = SPOE_APPCTX(appctx);
+
+	if (!spoe_appctx)
+		return;
+
+	spoe_agent_drop(spoe_appctx->agent);
 	pool_free(pool_head_spoe_appctx, spoe_appctx);
 }
 
@@ -554,6 +594,7 @@ struct applet spoe_applet = {
 	.rcv_buf = appctx_raw_rcv_buf,
 	.snd_buf = appctx_raw_snd_buf,
 	.release = spoe_release_appctx,
+	.destroy = spoe_destroy_appctx,
 };
 
 /* Create a SPOE applet. On success, the created applet is returned, else
@@ -575,6 +616,8 @@ static struct appctx *spoe_create_appctx(struct spoe_context *ctx)
 	spoe_appctx->spoe_ctx        = ctx;
 	ctx->spoe_appctx             = spoe_appctx;
 
+	spoe_agent_take(agent);
+
 	if ((appctx = appctx_new_here(&spoe_applet, NULL)) == NULL)
 		goto out_free_spoe_appctx;
 
@@ -588,16 +631,17 @@ static struct appctx *spoe_create_appctx(struct spoe_context *ctx)
 	/* Error unrolling */
  out_free_appctx:
 	appctx_free_on_early_error(appctx);
+	if (ctx->spoe_appctx == spoe_appctx)
+		ctx->spoe_appctx = NULL;
+	goto out_error;
+
  out_free_spoe_appctx:
-	/* the context must not be left pointing to the applet we're about to
-	 * release, the caller still uses it on the error path.
-	 */
 	if (ctx->spoe_appctx == spoe_appctx)
 		ctx->spoe_appctx = NULL;
 	pool_free(pool_head_spoe_appctx, spoe_appctx);
+	spoe_agent_drop(agent);
  out_error:
-	send_log(&agent->fe, LOG_EMERG, "SPOE: [%s] failed to create SPOE applet\n", agent->id);
- out:
+	send_log(agent->fe, LOG_EMERG, "SPOE: [%s] failed to create SPOE applet\n", agent->id);
 
 	return NULL;
 }
@@ -1092,8 +1136,8 @@ static int spoe_process_group(struct stream *s, struct spoe_context *ctx,
 
 	ret = spoe_process_messages(s, ctx, &group->messages, dir, SPOE_MSGS_BY_GROUP);
 	if (ret && ctx->stats.t_process != -1) {
-		if (ctx->status_code || !(agent->fe.options2 & PR_O2_NOLOGNORM))
-			send_log(&agent->fe, (!ctx->status_code ? LOG_NOTICE : LOG_WARNING),
+		if (ctx->status_code || !(agent->fe->options2 & PR_O2_NOLOGNORM))
+			send_log(agent->fe, (!ctx->status_code ? LOG_NOTICE : LOG_WARNING),
 				 "SPOE: [%s] <GROUP:%s> sid=%u st=%u %ld %llu/%llu\n",
 				 agent->id, group->id, s->uniq_id, ctx->status_code, ctx->stats.t_process,
 				 agent->counters.nb_errors, agent->counters.nb_processed);
@@ -1117,8 +1161,8 @@ static int spoe_process_event(struct stream *s, struct spoe_context *ctx,
 
 	ret = spoe_process_messages(s, ctx, &(ctx->events[ev]), dir, SPOE_MSGS_BY_EVENT);
 	if (ret && ctx->stats.t_process != -1) {
-		if (ctx->status_code || !(agent->fe.options2 & PR_O2_NOLOGNORM))
-			send_log(&agent->fe, (!ctx->status_code ? LOG_NOTICE : LOG_WARNING),
+		if (ctx->status_code || !(agent->fe->options2 & PR_O2_NOLOGNORM))
+			send_log(agent->fe, (!ctx->status_code ? LOG_NOTICE : LOG_WARNING),
 				 "SPOE: [%s] <EVENT:%s> sid=%u st=%u %ld %llu/%llu\n",
 				 agent->id, spoe_event_str[ev], s->uniq_id, ctx->status_code, ctx->stats.t_process,
 				 agent->counters.nb_errors, agent->counters.nb_processed);
@@ -1244,16 +1288,16 @@ static int spoe_init(struct proxy *px, struct flt_conf *fconf)
 
 	/* conf->agent->fe was already initialized during the config
 	 * parsing. Finish initialization. */
-	conf->agent->fe.mode = PR_MODE_SPOP;
-	conf->agent->fe.maxconn = 0;
-	conf->agent->fe.options2 |= PR_O2_INDEPSTR;
-	conf->agent->fe.conn_retries = CONN_RETRIES;
-	conf->agent->fe.accept = frontend_accept;
-	conf->agent->fe.srv = NULL;
-	conf->agent->fe.timeout.client = TICK_ETERNITY;
-	conf->agent->fe.fe_req_ana = AN_REQ_SWITCHING_RULES;
+	conf->agent->fe->mode = PR_MODE_SPOP;
+	conf->agent->fe->maxconn = 0;
+	conf->agent->fe->options2 |= PR_O2_INDEPSTR;
+	conf->agent->fe->conn_retries = CONN_RETRIES;
+	conf->agent->fe->accept = frontend_accept;
+	conf->agent->fe->srv = NULL;
+	conf->agent->fe->timeout.client = TICK_ETERNITY;
+	conf->agent->fe->fe_req_ana = AN_REQ_SWITCHING_RULES;
 
-	proxy_init_per_thr(&conf->agent->fe);
+	proxy_init_per_thr(conf->agent->fe);
 
 	conf->agent->engine_id = generate_pseudo_uuid();
 	if (conf->agent->engine_id == NULL)
@@ -1271,7 +1315,7 @@ static void spoe_deinit(struct proxy *px, struct flt_conf *fconf)
 	if (conf) {
 		struct spoe_agent *agent = conf->agent;
 
-		spoe_release_agent(agent);
+		spoe_agent_drop(agent);
 		free(conf->id);
 		free(conf);
 	}
@@ -1326,7 +1370,7 @@ static int spoe_check(struct proxy *px, struct flt_conf *fconf)
 		return 1;
 	}
 
-	if (postresolve_logger_list(NULL, &conf->agent->fe.loggers, "SPOE agent", conf->agent->id) & ERR_CODE)
+	if (postresolve_logger_list(NULL, &conf->agent->fe->loggers, "SPOE agent", conf->agent->id) & ERR_CODE)
 		return 1;
 
 	ha_free(&conf->agent->b.name);
@@ -1346,7 +1390,7 @@ static int spoe_start(struct stream *s, struct filter *filter)
 	struct spoe_context *ctx;
 
 	if ((ctx = spoe_create_context(s, filter)) == NULL) {
-		send_log(&agent->fe, LOG_EMERG,
+		send_log(agent->fe, LOG_EMERG,
 			 "SPOE: [%s] failed to create SPOE context\n",
 			 agent->id);
 		return 0;
@@ -1563,6 +1607,11 @@ static int cfg_parse_spoe_agent(const char *file, int linenum, char **args, int 
 		curagent->var_t_total    = NULL;
 		curagent->flags          = SPOE_FL_PIPELINING;
 		curagent->max_frame_size = SPOP_MAX_FRAME_SIZE;
+
+		/* The agent is owned by the filter configuration, which takes its
+		 * reference here. The applets will take theirs when created.
+		 */
+		curagent->refcount       = 1;
 
 		if ((curagent->events = calloc(SPOE_EV_EVENTS, sizeof(*curagent->events))) == NULL) {
 			ha_alert("parsing [%s:%d] : out of memory.\n", file, linenum);
@@ -2576,19 +2625,19 @@ static int parse_spoe_flt(char **args, int *cur_arg, struct proxy *px,
 
 	/* Start agent's proxy initialization here. It will be finished during
 	 * the filter init. */
-        memset(&conf->agent->fe, 0, sizeof(conf->agent->fe));
-	if (!setup_new_proxy(&conf->agent->fe, conf->agent->id, PR_CAP_FE | PR_CAP_INT, err)) {
+	conf->agent->fe = alloc_new_proxy(conf->agent->id, PR_CAP_FE | PR_CAP_INT, err);
+	if (!conf->agent->fe) {
 		memprintf(err, "SPOE agent '%s': %s",
 			  curagent->id, *err);
 		goto error;
 	}
-	conf->agent->fe.parent    = conf->agent;
-	conf->agent->fe.options  |= curpxopts;
-	conf->agent->fe.options2 |= curpxopts2;
+	conf->agent->fe->parent    = conf->agent;
+	conf->agent->fe->options  |= curpxopts;
+	conf->agent->fe->options2 |= curpxopts2;
 
 	list_for_each_entry_safe(logger, loggerback, &curloggers, list) {
 		LIST_DELETE(&logger->list);
-		LIST_APPEND(&conf->agent->fe.loggers, &logger->list);
+		LIST_APPEND(&conf->agent->fe->loggers, &logger->list);
 	}
 
 	list_for_each_entry_safe(ph, phback, &curmphs, list) {
