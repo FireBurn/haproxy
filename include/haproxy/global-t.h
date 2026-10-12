@@ -87,6 +87,8 @@
 #define GTUNE_LISTENER_MQ_ANY    (GTUNE_LISTENER_MQ_FAIR | GTUNE_LISTENER_MQ_OPT)
 #define GTUNE_NO_KTLS            (1<<29)
 
+/* Global tuning options for tune.options2, since tune.options is full */
+
 /* subsystem-specific debugging options for tune.debug */
 #define GDBG_CPU_AFFINITY           (1U<< 0)
 
@@ -174,6 +176,7 @@ struct global {
 		int max_rules_at_once; /* max number of rules executed in a single evaluation loop */
 		int maxaccept;     /* max number of consecutive accept() */
 		int options;       /* various tuning options */
+		uint options2;     /* more tuning options (GTUNE2_*) */
 		uint debug;        /* various debugging options (GDBG_*) */
 		int runqueue_depth;/* max number of tasks to run at once */
 		uint recv_enough;  /* how many input bytes at once are "enough" */
