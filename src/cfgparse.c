@@ -85,6 +85,7 @@
 #include <haproxy/sample.h>
 #include <haproxy/server.h>
 #include <haproxy/session.h>
+#include <haproxy/ssl_utils.h>
 #include <haproxy/stats-t.h>
 #include <haproxy/stick_table.h>
 #include <haproxy/stream.h>
@@ -2945,6 +2946,11 @@ init_proxies_list_stage1:
 			}
 		}
 
+		/* "tune.h2.fe.enabled off" implies "option disable-h2-upgrade" */
+		if ((curproxy->cap & PR_CAP_FE) && (curproxy->mode == PR_MODE_HTTP) &&
+		    (global.tune.options2 & GTUNE2_DISABLE_H2_FE))
+			curproxy->options2 |= PR_O2_NO_H2_UPGRADE;
+
 		/* check and reduce the bind-proc of each listener */
 		list_for_each_entry(bind_conf, &curproxy->conf.bind, by_fe) {
 			int mode = conn_pr_mode_to_proto_mode(curproxy->mode);
@@ -3043,6 +3049,9 @@ init_proxies_list_stage1:
 				bind_conf->ssl_conf.alpn_len = strlen(bind_conf->ssl_conf.alpn_str);
 			}
 #endif
+
+			if ((global.tune.options2 & GTUNE2_DISABLE_H2_FE) && curproxy->mode == PR_MODE_HTTP && bind_conf->ssl_conf.alpn_str)
+				alpn_remove_token(bind_conf->ssl_conf.alpn_str, &bind_conf->ssl_conf.alpn_len, ist("h2"));
 
 			if (curproxy->mode == PR_MODE_HTTP && global.tune.bufsize < 16384) {
 #ifdef OPENSSL_NPN_NEGOTIATED

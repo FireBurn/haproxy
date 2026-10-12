@@ -87,6 +87,7 @@
 #define GTUNE_LISTENER_MQ_ANY    (GTUNE_LISTENER_MQ_FAIR | GTUNE_LISTENER_MQ_OPT)
 
 /* Global tuning options for tune.options2, since tune.options is full */
+#define GTUNE2_DISABLE_H2_FE     (1U<<0)
 
 /* subsystem-specific debugging options for tune.debug */
 #define GDBG_CPU_AFFINITY           (1U<< 0)
