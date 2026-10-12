@@ -88,6 +88,7 @@
 #define GTUNE_NO_KTLS            (1<<29)
 
 /* Global tuning options for tune.options2, since tune.options is full */
+#define GTUNE2_DISABLE_H2_FE     (1U<<0)
 
 /* subsystem-specific debugging options for tune.debug */
 #define GDBG_CPU_AFFINITY           (1U<< 0)
