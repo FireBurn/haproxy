@@ -6962,17 +6962,18 @@ static int quic_retry_token_check(struct quic_rx_packet *pkt,
 }
 
 /* Generate a Retry packet and send it on <l> listener socket to <dst> in
- * response to the Initial <pkt> packet.
+ * response to the Initial <pkt> packet. <src> is the local address targeted by
+ * the peer, used as datagram source if possible (see quic_lstnr_sock_send()).
  *
  * Returns 0 on success else non-zero.
  */
-static int send_retry(struct listener *l, struct sockaddr_storage *dst,
+static int send_retry(struct listener *l, struct sockaddr_storage *src,
+		      struct sockaddr_storage *dst,
                       struct quic_rx_packet *pkt, const struct quic_version *qv)
 {
 	int ret = 0;
 	unsigned char buf[128];
 	int i = 0, token_len;
-	const socklen_t addrlen = get_addr_len(dst);
 	struct quic_cid scid;
 
 	TRACE_ENTER(QUIC_EV_CONN_TXPKT);
@@ -7021,8 +7022,8 @@ static int send_retry(struct listener *l, struct sockaddr_storage *dst,
 
 	i += QUIC_TLS_TAG_LEN;
 
-	if (sendto(l->rx.fd, buf, i, 0, (struct sockaddr *)dst, addrlen) < 0) {
-		TRACE_ERROR("quic_tls_generate_retry_integrity_tag() failed", QUIC_EV_CONN_TXPKT);
+	if (quic_lstnr_sock_send(l, buf, i, src, dst) < 0) {
+		TRACE_ERROR("Retry emission failed", QUIC_EV_CONN_TXPKT);
 		goto out;
 	}
 
@@ -7262,7 +7263,7 @@ static struct quic_conn *quic_rx_pkt_retrieve_conn(struct quic_rx_packet *pkt,
 				 HA_ATOMIC_LOAD(&prx_counters->half_open_conn) >= global.tune.quic_retry_threshold) {
 				TRACE_PROTO("Initial without token, sending retry",
 				            QUIC_EV_CONN_LPKT, NULL, NULL, NULL, pkt->version);
-				if (send_retry(l, &dgram->saddr, pkt, pkt->version)) {
+				if (send_retry(l, &dgram->daddr, &dgram->saddr, pkt, pkt->version)) {
 					TRACE_ERROR("Error during Retry generation",
 					            QUIC_EV_CONN_LPKT, NULL, NULL, NULL, pkt->version);
 					goto out;
@@ -7469,7 +7470,7 @@ static int quic_rx_pkt_parse(struct quic_rx_packet *pkt,
 				if (l->bind_conf->options & BC_O_QUIC_FORCE_RETRY) {
 					TRACE_PROTO("Initial without token, sending retry",
 					            QUIC_EV_CONN_LPKT, NULL, NULL, NULL, pkt->version);
-					if (send_retry(l, &dgram->saddr, pkt, pkt->version)) {
+					if (send_retry(l, &dgram->daddr, &dgram->saddr, pkt, pkt->version)) {
 						TRACE_PROTO("Error during Retry generation",
 						            QUIC_EV_CONN_LPKT, NULL, NULL, NULL, pkt->version);
 						goto drop_silent;
