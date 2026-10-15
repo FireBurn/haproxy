@@ -880,6 +880,7 @@ ssize_t quic_lstnr_sock_send(struct listener *l, const void *buf, size_t len,
                              struct sockaddr_storage *src,
                              struct sockaddr_storage *dst)
 {
+	ssize_t ret;
 	struct msghdr msg;
 	struct iovec vec;
 	struct cmsghdr *cmsg = NULL;
@@ -914,7 +915,11 @@ ssize_t quic_lstnr_sock_send(struct listener *l, const void *buf, size_t len,
 		cmsg_set_saddr(&msg, &cmsg, src);
 	}
 
-	return sendmsg(l->rx.fd, &msg, 0);
+	do {
+		ret = sendmsg(l->rx.fd, &msg, 0);
+	} while (ret < 0 && errno == EINTR);
+
+	return ret;
 }
 
 /* Receive datagram on <qc> FD-owned socket.
