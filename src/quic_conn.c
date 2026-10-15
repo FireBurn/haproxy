@@ -6614,20 +6614,21 @@ int qc_parse_hd_form(struct quic_rx_packet *pkt,
 
 /*
  * Send a Version Negotiation packet on response to <pkt> on <l> listener
- * socket to <dst> address.
+ * socket to <dst> address. <src> is the local address targeted by the peer,
+ * used as datagram source if possible (see quic_lstnr_sock_send()).
  * Implementation of RFC9000 6. Version Negotiation
  *
  * TODO implement a rate-limiting sending of Version Negotiation packets
  *
  * Returns 0 on success else non-zero
  */
-static int send_version_negotiation(struct listener *l, struct sockaddr_storage *dst,
+static int send_version_negotiation(struct listener *l, struct sockaddr_storage *src,
+				    struct sockaddr_storage *dst,
                                     struct quic_rx_packet *pkt)
 {
 	char buf[256];
 	int ret = 0, i = 0, j;
 	uint32_t version;
-	const socklen_t addrlen = get_addr_len(dst);
 
 	TRACE_ENTER(QUIC_EV_CONN_TXPKT);
 	/*
@@ -6664,7 +6665,7 @@ static int send_version_negotiation(struct listener *l, struct sockaddr_storage 
 		i += sizeof(version);
 	}
 
-	if (sendto(l->rx.fd, buf, i, 0, (struct sockaddr *)dst, addrlen) < 0)
+	if (quic_lstnr_sock_send(l, buf, i, src, dst) < 0)
 		goto out;
 
 	ret = 1;
@@ -7443,7 +7444,7 @@ static int quic_rx_pkt_parse(struct quic_rx_packet *pkt,
 		/* RFC9000 6. Version Negotiation */
 		if (!pkt->version) {
 			 /* unsupported version, send Negotiation packet */
-			if (send_version_negotiation(l, &dgram->saddr, pkt)) {
+			if (send_version_negotiation(l, &dgram->daddr, &dgram->saddr, pkt)) {
 				TRACE_ERROR("VN packet not sent", QUIC_EV_CONN_LPKT);
 				goto drop_silent;
 			}
