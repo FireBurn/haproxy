@@ -6613,21 +6613,21 @@ int qc_parse_hd_form(struct quic_rx_packet *pkt,
 }
 
 /*
- * Send a Version Negotiation packet on response to <pkt> on socket <fd> to
- * address <addr>.
+ * Send a Version Negotiation packet on response to <pkt> on <l> listener
+ * socket to <dst> address.
  * Implementation of RFC9000 6. Version Negotiation
  *
  * TODO implement a rate-limiting sending of Version Negotiation packets
  *
  * Returns 0 on success else non-zero
  */
-static int send_version_negotiation(int fd, struct sockaddr_storage *addr,
+static int send_version_negotiation(struct listener *l, struct sockaddr_storage *dst,
                                     struct quic_rx_packet *pkt)
 {
 	char buf[256];
 	int ret = 0, i = 0, j;
 	uint32_t version;
-	const socklen_t addrlen = get_addr_len(addr);
+	const socklen_t addrlen = get_addr_len(dst);
 
 	TRACE_ENTER(QUIC_EV_CONN_TXPKT);
 	/*
@@ -6664,7 +6664,7 @@ static int send_version_negotiation(int fd, struct sockaddr_storage *addr,
 		i += sizeof(version);
 	}
 
-	if (sendto(fd, buf, i, 0, (struct sockaddr *)addr, addrlen) < 0)
+	if (sendto(l->rx.fd, buf, i, 0, (struct sockaddr *)dst, addrlen) < 0)
 		goto out;
 
 	ret = 1;
@@ -6673,8 +6673,8 @@ static int send_version_negotiation(int fd, struct sockaddr_storage *addr,
 	return !ret;
 }
 
-/* Send a stateless reset packet depending on <pkt> RX packet information
- * from <fd> UDP socket to <dst>
+/* Send a stateless reset packet depending on <rxpkt> RX packet information
+ * from <l> listener socket to <dstaddr>
  * Return 1 if succeeded, 0 if not.
  */
 static int send_stateless_reset(struct listener *l, struct sockaddr_storage *dstaddr,
@@ -6961,18 +6961,18 @@ static int quic_retry_token_check(struct quic_rx_packet *pkt,
 	goto leave;
 }
 
-/* Generate a Retry packet and send it on <fd> socket to <addr> in response to
- * the Initial <pkt> packet.
+/* Generate a Retry packet and send it on <l> listener socket to <dst> in
+ * response to the Initial <pkt> packet.
  *
  * Returns 0 on success else non-zero.
  */
-static int send_retry(int fd, struct sockaddr_storage *addr,
+static int send_retry(struct listener *l, struct sockaddr_storage *dst,
                       struct quic_rx_packet *pkt, const struct quic_version *qv)
 {
 	int ret = 0;
 	unsigned char buf[128];
 	int i = 0, token_len;
-	const socklen_t addrlen = get_addr_len(addr);
+	const socklen_t addrlen = get_addr_len(dst);
 	struct quic_cid scid;
 
 	TRACE_ENTER(QUIC_EV_CONN_TXPKT);
@@ -7004,7 +7004,7 @@ static int send_retry(int fd, struct sockaddr_storage *addr,
 
 	/* token */
 	if (!(token_len = quic_generate_retry_token(&buf[i], sizeof(buf) - i, qv->num,
-	                                            &pkt->dcid, &pkt->scid, addr))) {
+	                                            &pkt->dcid, &pkt->scid, dst))) {
 		TRACE_ERROR("quic_generate_retry_token() failed", QUIC_EV_CONN_TXPKT);
 		goto out;
 	}
@@ -7021,7 +7021,7 @@ static int send_retry(int fd, struct sockaddr_storage *addr,
 
 	i += QUIC_TLS_TAG_LEN;
 
-	if (sendto(fd, buf, i, 0, (struct sockaddr *)addr, addrlen) < 0) {
+	if (sendto(l->rx.fd, buf, i, 0, (struct sockaddr *)dst, addrlen) < 0) {
 		TRACE_ERROR("quic_tls_generate_retry_integrity_tag() failed", QUIC_EV_CONN_TXPKT);
 		goto out;
 	}
@@ -7262,7 +7262,7 @@ static struct quic_conn *quic_rx_pkt_retrieve_conn(struct quic_rx_packet *pkt,
 				 HA_ATOMIC_LOAD(&prx_counters->half_open_conn) >= global.tune.quic_retry_threshold) {
 				TRACE_PROTO("Initial without token, sending retry",
 				            QUIC_EV_CONN_LPKT, NULL, NULL, NULL, pkt->version);
-				if (send_retry(l->rx.fd, &dgram->saddr, pkt, pkt->version)) {
+				if (send_retry(l, &dgram->saddr, pkt, pkt->version)) {
 					TRACE_ERROR("Error during Retry generation",
 					            QUIC_EV_CONN_LPKT, NULL, NULL, NULL, pkt->version);
 					goto out;
@@ -7440,7 +7440,7 @@ static int quic_rx_pkt_parse(struct quic_rx_packet *pkt,
 		/* RFC9000 6. Version Negotiation */
 		if (!pkt->version) {
 			 /* unsupported version, send Negotiation packet */
-			if (send_version_negotiation(l->rx.fd, &dgram->saddr, pkt)) {
+			if (send_version_negotiation(l, &dgram->saddr, pkt)) {
 				TRACE_ERROR("VN packet not sent", QUIC_EV_CONN_LPKT);
 				goto drop_silent;
 			}
@@ -7469,7 +7469,7 @@ static int quic_rx_pkt_parse(struct quic_rx_packet *pkt,
 				if (l->bind_conf->options & BC_O_QUIC_FORCE_RETRY) {
 					TRACE_PROTO("Initial without token, sending retry",
 					            QUIC_EV_CONN_LPKT, NULL, NULL, NULL, pkt->version);
-					if (send_retry(l->rx.fd, &dgram->saddr, pkt, pkt->version)) {
+					if (send_retry(l, &dgram->saddr, pkt, pkt->version)) {
 						TRACE_PROTO("Error during Retry generation",
 						            QUIC_EV_CONN_LPKT, NULL, NULL, NULL, pkt->version);
 						goto drop_silent;
