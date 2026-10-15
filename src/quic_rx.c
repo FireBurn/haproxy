@@ -1811,7 +1811,7 @@ static struct quic_conn *quic_rx_pkt_retrieve_conn(struct quic_rx_packet *pkt,
 				/* Validate the token, retry or not only when connection is unknown. */
 				if (!quic_token_validate(pkt, dgram, l, qc, &token_odcid)) {
 					if (dgram->flags & QUIC_DGRAM_FL_SEND_RETRY) {
-						if (send_retry(l->rx.fd, &dgram->saddr, pkt, pkt->version)) {
+						if (send_retry(l, &dgram->saddr, pkt, pkt->version)) {
 							TRACE_ERROR("Error during Retry generation",
 							            QUIC_EV_CONN_LPKT, NULL, NULL, NULL, pkt->version);
 						}
@@ -1841,7 +1841,7 @@ static struct quic_conn *quic_rx_pkt_retrieve_conn(struct quic_rx_packet *pkt,
 
 					TRACE_PROTO("Initial without token, sending retry",
 						    QUIC_EV_CONN_LPKT, NULL, NULL, NULL, pkt->version);
-					if (send_retry(l->rx.fd, &dgram->saddr, pkt, pkt->version)) {
+					if (send_retry(l, &dgram->saddr, pkt, pkt->version)) {
 						TRACE_ERROR("Error during Retry generation",
 							    QUIC_EV_CONN_LPKT, NULL, NULL, NULL, pkt->version);
 						goto out;
@@ -2016,7 +2016,7 @@ static int quic_rx_pkt_parse(struct quic_conn *qc, struct quic_rx_packet *pkt,
 		 */
 		if (l && !pkt->version) {
 			 /* unsupported version, send Negotiation packet */
-			if (send_version_negotiation(l->rx.fd, &dgram->saddr, pkt)) {
+			if (send_version_negotiation(l, &dgram->saddr, pkt)) {
 				TRACE_ERROR("VN packet not sent", QUIC_EV_CONN_LPKT);
 				goto drop_silent;
 			}
