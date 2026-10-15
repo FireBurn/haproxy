@@ -2016,7 +2016,7 @@ static int quic_rx_pkt_parse(struct quic_conn *qc, struct quic_rx_packet *pkt,
 		 */
 		if (l && !pkt->version) {
 			 /* unsupported version, send Negotiation packet */
-			if (send_version_negotiation(l, &dgram->saddr, pkt)) {
+			if (send_version_negotiation(l, &dgram->daddr, &dgram->saddr, pkt)) {
 				TRACE_ERROR("VN packet not sent", QUIC_EV_CONN_LPKT);
 				goto drop_silent;
 			}
