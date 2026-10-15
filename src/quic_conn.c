@@ -6674,15 +6674,17 @@ static int send_version_negotiation(struct listener *l, struct sockaddr_storage 
 }
 
 /* Send a stateless reset packet depending on <rxpkt> RX packet information
- * from <l> listener socket to <dstaddr>
+ * from <l> listener socket to <dstaddr>. <srcaddr> is the local address
+ * targeted by the peer, used as datagram source if possible (see
+ * quic_lstnr_sock_send()).
  * Return 1 if succeeded, 0 if not.
  */
-static int send_stateless_reset(struct listener *l, struct sockaddr_storage *dstaddr,
-                                struct quic_rx_packet *rxpkt)
+static int send_stateless_reset(struct listener *l, struct sockaddr_storage *srcaddr,
+				struct sockaddr_storage *dstaddr,
+				struct quic_rx_packet *rxpkt)
 {
 	int ret = 0, pktlen, rndlen;
 	unsigned char pkt[64];
-	const socklen_t addrlen = get_addr_len(dstaddr);
 	struct proxy *prx;
 	struct quic_counters *prx_counters;
 
@@ -6735,7 +6737,7 @@ static int send_stateless_reset(struct listener *l, struct sockaddr_storage *dst
 	                                    rxpkt->dcid.data, rxpkt->dcid.len))
 		goto leave;
 
-	if (sendto(l->rx.fd, pkt, pktlen, 0, (struct sockaddr *)dstaddr, addrlen) < 0)
+	if (quic_lstnr_sock_send(l, pkt, pktlen, srcaddr, dstaddr) < 0)
 		goto leave;
 
     ret = 1;
@@ -7339,7 +7341,7 @@ static struct quic_conn *quic_rx_pkt_retrieve_conn(struct quic_rx_packet *pkt,
 		 * emits stateless_reset_token in its TPs.
 		 */
 		TRACE_PROTO("RX non Initial pkt without connection", QUIC_EV_CONN_LPKT, NULL, NULL, NULL, pkt->version);
-		if (!send_stateless_reset(l, &dgram->saddr, pkt))
+		if (!send_stateless_reset(l, &dgram->daddr, &dgram->saddr, pkt))
 			TRACE_ERROR("stateless reset not sent", QUIC_EV_CONN_LPKT, qc);
 		goto err;
 	}
