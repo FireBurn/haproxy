@@ -1743,7 +1743,7 @@ static struct quic_conn *quic_rx_pkt_retrieve_conn(struct quic_rx_packet *pkt,
 				/* Validate the token, retry or not only when connection is unknown. */
 				if (!quic_token_validate(pkt, dgram, l, qc, &token_odcid)) {
 					if (dgram->flags & QUIC_DGRAM_FL_SEND_RETRY) {
-						if (send_retry(l, &dgram->saddr, pkt, pkt->version)) {
+						if (send_retry(l, &dgram->daddr, &dgram->saddr, pkt, pkt->version)) {
 							TRACE_ERROR("Error during Retry generation",
 							            QUIC_EV_CONN_LPKT, NULL, NULL, NULL, pkt->version);
 						}
@@ -1762,7 +1762,7 @@ static struct quic_conn *quic_rx_pkt_retrieve_conn(struct quic_rx_packet *pkt,
 				    HA_ATOMIC_LOAD(&prx_counters->half_open_conn) >= global.tune.quic_retry_threshold) {
 					TRACE_PROTO("Initial without token, sending retry",
 					            QUIC_EV_CONN_LPKT, NULL, NULL, NULL, pkt->version);
-					if (send_retry(l, &dgram->saddr, pkt, pkt->version)) {
+					if (send_retry(l, &dgram->daddr, &dgram->saddr, pkt, pkt->version)) {
 						TRACE_ERROR("Error during Retry generation",
 									QUIC_EV_CONN_LPKT, NULL, NULL, NULL, pkt->version);
 						goto out;
@@ -1967,7 +1967,7 @@ static int quic_rx_pkt_parse(struct quic_rx_packet *pkt,
 				if (l->bind_conf->options & BC_O_QUIC_FORCE_RETRY) {
 					TRACE_PROTO("Initial without token, sending retry",
 					            QUIC_EV_CONN_LPKT, NULL, NULL, NULL, pkt->version);
-					if (send_retry(l, &dgram->saddr, pkt, pkt->version)) {
+					if (send_retry(l, &dgram->daddr, &dgram->saddr, pkt, pkt->version)) {
 						TRACE_PROTO("Error during Retry generation",
 						            QUIC_EV_CONN_LPKT, NULL, NULL, NULL, pkt->version);
 						goto drop_silent;
