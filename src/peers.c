@@ -3559,7 +3559,7 @@ static void __process_running_peer_sync(struct task *task, struct peers *peers, 
 							/* We are going to send updates, let's ensure we will
 							 * come back to send heartbeat messages or to reconnect.
 							 */
-							task->expire = tick_first(peer->reconnect, peer->heartbeat);
+							task->expire = tick_first(task->expire, tick_first(peer->reconnect, peer->heartbeat));
 							appctx_wakeup(peer->appctx);
 							break;
 						}
@@ -3589,7 +3589,7 @@ static void __process_running_peer_sync(struct task *task, struct peers *peers, 
 							peer->flags |= PEER_F_HEARTBEAT;
 							appctx_wakeup(peer->appctx);
 						}
-						task->expire = tick_first(peer->reconnect, peer->heartbeat);
+						task->expire = tick_first(task->expire, tick_first(peer->reconnect, peer->heartbeat));
 					}
 				}
 				/* else do nothing */
