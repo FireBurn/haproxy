@@ -1360,7 +1360,6 @@ static ssize_t h3_parse_settings_frm(struct h3c *h3c, const struct buffer *buf,
 	while (b_data(&b)) {
 		if (!b_quic_dec_int(&id, &b, &ret) || !b_quic_dec_int(&value, &b, &ret)) {
 			h3c->err = H3_ERR_FRAME_ERROR;
-			qcc_report_glitch(h3c->qcc, 1);
 			return -1;
 		}
 
@@ -1378,7 +1377,6 @@ static ssize_t h3_parse_settings_frm(struct h3c *h3c, const struct buffer *buf,
 		if (id < sizeof(mask)) {
 			if (ha_bit_test(id, &mask)) {
 				h3c->err = H3_ERR_SETTINGS_ERROR;
-				qcc_report_glitch(h3c->qcc, 1);
 				return -1;
 			}
 			ha_bit_set(id, &mask);
@@ -1409,7 +1407,6 @@ static ssize_t h3_parse_settings_frm(struct h3c *h3c, const struct buffer *buf,
 			 * H3_SETTINGS_ERROR.
 			 */
 			h3c->err = H3_ERR_SETTINGS_ERROR;
-			qcc_report_glitch(h3c->qcc, 1);
 			return -1;
 		default:
 			/* MUST be ignored */
@@ -1661,6 +1658,7 @@ static ssize_t h3_rcv_buf(struct qcs *qcs, struct buffer *b, int fin)
 			if (ret < 0) {
 				TRACE_ERROR("error on SETTINGS parsing", H3_EV_RX_FRAME, qcs->qcc->conn, qcs);
 				qcc_set_error(qcs->qcc, h3c->err, 1);
+				qcc_report_glitch(qcs->qcc, 1);
 				goto err;
 			}
 			h3c->flags |= H3_CF_SETTINGS_RECV;
