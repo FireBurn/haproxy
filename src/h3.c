@@ -1678,6 +1678,7 @@ static ssize_t h3_rcv_buf(struct qcs *qcs, struct buffer *b, int fin)
 					h3s->err = H3_ERR_MESSAGE_ERROR;
 					qcc_report_glitch(qcs->qcc, 1);
 					ret = -1;
+					break;
 				}
 
 				if (!(appbuf = qcc_get_stream_rxbuf(qcs))) {
