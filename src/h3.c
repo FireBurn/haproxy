@@ -688,10 +688,8 @@ static ssize_t h3_req_headers_to_htx(struct qcs *qcs, const struct buffer *buf,
 	                    list, sizeof(list) / sizeof(list[0]));
 	if (ret < 0) {
 		TRACE_ERROR("QPACK decoding error", H3_EV_RX_FRAME|H3_EV_RX_HDR, qcs->qcc->conn, qcs);
-		if ((qpack_err = qpack_err_decode(ret)) >= 0) {
+		if ((qpack_err = qpack_err_decode(ret)) >= 0)
 			h3c->err = qpack_err;
-			qcc_report_glitch(qcs->qcc, 1);
-		}
 		len = -1;
 		goto out;
 	}
@@ -1198,10 +1196,8 @@ static ssize_t h3_resp_headers_to_htx(struct qcs *qcs, const struct buffer *buf,
 	                    list, sizeof(list) / sizeof(list[0]));
 	if (ret < 0) {
 		TRACE_ERROR("QPACK decoding error", H3_EV_RX_FRAME|H3_EV_RX_HDR, qcs->qcc->conn, qcs);
-		if ((qpack_err = qpack_err_decode(ret)) >= 0) {
+		if ((qpack_err = qpack_err_decode(ret)) >= 0)
 			h3c->err = qpack_err;
-			qcc_report_glitch(qcs->qcc, 1);
-		}
 		len = -1;
 		goto out;
 	}
@@ -1464,10 +1460,8 @@ static ssize_t h3_trailers_to_htx(struct qcs *qcs, const struct buffer *buf,
 		                      tmp, list, sizeof(list) / sizeof(list[0]));
 		if (ret < 0) {
 			TRACE_ERROR("QPACK decoding error", H3_EV_RX_FRAME|H3_EV_RX_HDR, qcs->qcc->conn, qcs);
-			if ((qpack_err = qpack_err_decode(ret)) >= 0) {
+			if ((qpack_err = qpack_err_decode(ret)) >= 0)
 				h3c->err = qpack_err;
-				qcc_report_glitch(qcs->qcc, 1);
-			}
 			len = -1;
 			goto out;
 		}
@@ -2032,6 +2026,13 @@ static ssize_t h3_rcv_buf(struct qcs *qcs, struct buffer *b, int fin)
 				ret = h3_trailers_to_htx(qcs, b, flen, last_stream_frame);
 				h3s->st_req = H3S_ST_REQ_TRAILERS;
 			}
+
+			if (h3c->err) {
+				qcc_set_error(qcs->qcc, h3c->err, 1);
+				qcc_report_glitch(qcs->qcc, 1);
+				goto err;
+			}
+
 			break;
 		case H3_FT_CANCEL_PUSH:
 			if (unlikely(!flen)) {
