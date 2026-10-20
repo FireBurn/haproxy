@@ -297,6 +297,7 @@ static void da_haproxy_checkinst(void)
             }
 #endif
             strlcpy2(atlasp, base + sizeof(char), sizeof(atlasp));
+            base[0] = 0;
             jsonp = fopen(atlasp, "r");
             if (jsonp == 0) {
                 ha_alert("deviceatlas : '%s' json file has invalid path or is not readable.\n",
@@ -320,7 +321,6 @@ static void da_haproxy_checkinst(void)
                         if (nl > maxhdrlen)
                             maxhdrlen = nl;
                     }
-                    base[0] = 0;
 #ifdef USE_THREAD
                     HA_SPIN_UNLOCK(OTHER_LOCK, &dadwsch_lock);
 #endif
