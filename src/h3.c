@@ -1005,6 +1005,13 @@ static ssize_t h3_headers_to_htx(struct qcs *qcs, const struct buffer *buf,
 	if (fin)
 		htx->flags |= HTX_FL_EOM;
 
+	/* Check that at least reserved space remains after headers decoding. */
+	if (htx_free_space(htx) < global.tune.maxrewrite) {
+		/* TODO should be a stream level error instead of a connection one. */
+		len = -1;
+		goto out;
+	}
+
 	htx_to_buf(htx, &htx_buf);
 	htx = NULL;
 
