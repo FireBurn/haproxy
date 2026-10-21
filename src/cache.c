@@ -2682,6 +2682,8 @@ int post_check_cache()
 					continue;
 
 				cconf = fconf->conf;
+				if (cconf->flags & CACHE_FLT_INIT)
+					continue;
 				if (strcmp(cache->id, cconf->c.name) == 0) {
 					free(cconf->c.name);
 					cconf->flags |= CACHE_FLT_INIT;
