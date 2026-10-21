@@ -1,0 +1,18 @@
+#REGTEST_TYPE=bug
+varnishtest "A program section must not abort when a peers section is configured"
+
+feature ignore_unknown_macro
+
+haproxy h1 -W -conf {
+    global
+       expose-deprecated-directives
+       localpeer p
+
+       peers pp
+         peer p 127.0.0.1:5108
+
+       program x
+         command /bin/true
+} -start
+
+delay 1
