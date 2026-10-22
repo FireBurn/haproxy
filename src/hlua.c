@@ -403,7 +403,9 @@ static lua_State *hlua_states[MAX_THREADS + 1];
 #define HLUA_FLT_CB_ARG_CHN       0x00000004
 #define HLUA_FLT_CB_ARG_HTTP_MSG  0x00000008
 
-#define HLUA_FLT_CTX_FL_PAYLOAD  0x00000001
+#define HLUA_FLT_CTX_FL_REQ_PAYLOAD   0x00000001
+#define HLUA_FLT_CTX_FL_RES_PAYLOAD   0x00000002
+#define HLUA_FLT_CTX_FL_PAYLOAD_BIT(idx) ((idx) ? HLUA_FLT_CTX_FL_RES_PAYLOAD : HLUA_FLT_CTX_FL_REQ_PAYLOAD)
 
 struct hlua_reg_filter  {
 	char *name;
@@ -465,7 +467,7 @@ struct hlua_cli_ctx {
 
 DECLARE_STATIC_TYPED_POOL(pool_head_hlua_flt_ctx, "hlua_flt_ctx", struct hlua_flt_ctx);
 
-static int hlua_filter_from_payload(struct filter *filter);
+static int hlua_filter_from_payload(struct filter *filter, struct channel *chn);
 
 /* This is the chained list of struct hlua_flt referenced
  * for haproxy filters. It is used for a post-initialisation control.
@@ -3879,7 +3881,7 @@ static struct filter *hlua_channel_filter(lua_State *L, int ud, struct channel *
 
 		filter  = lua_touserdata (L, -1);
 		flt_ctx = filter->ctx;
-		if (hlua_filter_from_payload(filter)) {
+		if (hlua_filter_from_payload(filter, chn)) {
 			*offset  = flt_ctx->cur_off[CHN_IDX(chn)];
 			*len     = flt_ctx->cur_len[CHN_IDX(chn)];
 		}
@@ -3968,7 +3970,7 @@ __LJMP static int hlua_channel_get_data_yield(lua_State *L, int status, lua_KCon
 	input = ci_data(chn);
 
 	filter = hlua_channel_filter(L, 1, chn, &output, &input);
-	if (filter && !hlua_filter_from_payload(filter))
+	if (filter && !hlua_filter_from_payload(filter, chn))
 		WILL_LJMP(lua_error(L));
 
 	offset = output;
@@ -4051,7 +4053,7 @@ __LJMP static int hlua_channel_get_line_yield(lua_State *L, int status, lua_KCon
 	input = ci_data(chn);
 
 	filter = hlua_channel_filter(L, 1, chn, &output, &input);
-	if (filter && !hlua_filter_from_payload(filter))
+	if (filter && !hlua_filter_from_payload(filter, chn))
 		WILL_LJMP(lua_error(L));
 
 	offset = output;
@@ -4145,7 +4147,7 @@ __LJMP static int hlua_channel_dup(lua_State *L)
 	len = ci_data(chn);
 
 	filter = hlua_channel_filter(L, 1, chn, &offset, &len);
-	if (filter && !hlua_filter_from_payload(filter))
+	if (filter && !hlua_filter_from_payload(filter, chn))
 		WILL_LJMP(lua_error(L));
 
 	if (!ci_data(chn) && channel_input_closed(chn)) {
@@ -4184,7 +4186,7 @@ __LJMP static int hlua_channel_get(lua_State *L)
 	len = ci_data(chn);
 
 	filter = hlua_channel_filter(L, 1, chn, &offset, &len);
-	if (filter && !hlua_filter_from_payload(filter))
+	if (filter && !hlua_filter_from_payload(filter, chn))
 		WILL_LJMP(lua_error(L));
 
 	if (!ci_data(chn) && channel_input_closed(chn)) {
@@ -4218,7 +4220,7 @@ __LJMP static int hlua_channel_getline_yield(lua_State *L, int status, lua_KCont
 	len = ci_data(chn);
 
 	filter = hlua_channel_filter(L, 1, chn, &offset, &len);
-	if (filter && !hlua_filter_from_payload(filter))
+	if (filter && !hlua_filter_from_payload(filter, chn))
 		WILL_LJMP(lua_error(L));
 
 	if (!ci_data(chn) && channel_input_closed(chn)) {
@@ -4326,7 +4328,7 @@ __LJMP static int hlua_channel_append(lua_State *L)
 	len = ci_data(chn);
 
 	filter = hlua_channel_filter(L, 1, chn, &offset, &len);
-	if (filter && !hlua_filter_from_payload(filter))
+	if (filter && !hlua_filter_from_payload(filter, chn))
 		WILL_LJMP(lua_error(L));
 
 	ret = _hlua_channel_insert(chn, L, ist2(str, sz), offset);
@@ -4367,7 +4369,7 @@ __LJMP static int hlua_channel_prepend(lua_State *L)
 	len = ci_data(chn);
 
 	filter = hlua_channel_filter(L, 1, chn, &offset, &len);
-	if (filter && !hlua_filter_from_payload(filter))
+	if (filter && !hlua_filter_from_payload(filter, chn))
 		WILL_LJMP(lua_error(L));
 
 	ret = _hlua_channel_insert(chn, L, ist2(str, sz), offset);
@@ -4406,7 +4408,7 @@ __LJMP static int hlua_channel_insert_data(lua_State *L)
 	input = ci_data(chn);
 
 	filter = hlua_channel_filter(L, 1, chn, &output, &input);
-	if (filter && !hlua_filter_from_payload(filter))
+	if (filter && !hlua_filter_from_payload(filter, chn))
 		WILL_LJMP(lua_error(L));
 
 	offset = output;
@@ -4465,7 +4467,7 @@ __LJMP static int hlua_channel_set_data(lua_State *L)
 	input = ci_data(chn);
 
 	filter = hlua_channel_filter(L, 1, chn, &output, &input);
-	if (filter && !hlua_filter_from_payload(filter))
+	if (filter && !hlua_filter_from_payload(filter, chn))
 		WILL_LJMP(lua_error(L));
 
 	offset = output;
@@ -4539,7 +4541,7 @@ __LJMP static int hlua_channel_del_data(lua_State *L)
 	input = ci_data(chn);
 
 	filter = hlua_channel_filter(L, 1, chn, &output, &input);
-	if (filter && !hlua_filter_from_payload(filter))
+	if (filter && !hlua_filter_from_payload(filter, chn))
 		WILL_LJMP(lua_error(L));
 
 	offset = output;
@@ -4609,7 +4611,7 @@ __LJMP static int hlua_channel_send_yield(lua_State *L, int status, lua_KContext
 	len = ci_data(chn);
 
 	filter = hlua_channel_filter(L, 1, chn, &offset, &len);
-	if (filter && !hlua_filter_from_payload(filter))
+	if (filter && !hlua_filter_from_payload(filter, chn))
 		WILL_LJMP(lua_error(L));
 
 
@@ -4721,7 +4723,7 @@ __LJMP static int hlua_channel_forward_yield(lua_State *L, int status, lua_KCont
 	len = ci_data(chn);
 
 	filter = hlua_channel_filter(L, 1, chn, &offset, &len);
-	if (filter && !hlua_filter_from_payload(filter))
+	if (filter && !hlua_filter_from_payload(filter, chn))
 		WILL_LJMP(lua_error(L));
 
 	max = fwd - l;
@@ -7556,7 +7558,7 @@ __LJMP static int hlua_http_msg_get_body(lua_State *L)
 		WILL_LJMP(lua_error(L));
 
 	filter = hlua_http_msg_filter(L, 1, msg, &output, &input);
-	if (!filter || !hlua_filter_from_payload(filter))
+	if (!filter || !hlua_filter_from_payload(filter, msg->chn))
 		WILL_LJMP(lua_error(L));
 
 	if (!ci_data(msg->chn) && channel_input_closed(msg->chn)) {
@@ -7615,7 +7617,7 @@ __LJMP static int hlua_http_msg_append(lua_State *L)
 
 	str = MAY_LJMP(luaL_checklstring(L, 2, &sz));
 	filter = hlua_http_msg_filter(L, 1, msg, &offset, &len);
-	if (!filter || !hlua_filter_from_payload(filter))
+	if (!filter || !hlua_filter_from_payload(filter, msg->chn))
 		WILL_LJMP(lua_error(L));
 
 	ret = _hlua_http_msg_insert(msg, filter, ist2(str, sz), offset+len);
@@ -7645,7 +7647,7 @@ __LJMP static int hlua_http_msg_prepend(lua_State *L)
 
 	str = MAY_LJMP(luaL_checklstring(L, 2, &sz));
 	filter = hlua_http_msg_filter(L, 1, msg, &offset, &len);
-	if (!filter || !hlua_filter_from_payload(filter))
+	if (!filter || !hlua_filter_from_payload(filter, msg->chn))
 		WILL_LJMP(lua_error(L));
 
 	ret = _hlua_http_msg_insert(msg, filter, ist2(str, sz), offset);
@@ -7678,7 +7680,7 @@ __LJMP static int hlua_http_msg_insert_data(lua_State *L)
 
 	str = MAY_LJMP(luaL_checklstring(L, 2, &sz));
 	filter = hlua_http_msg_filter(L, 1, msg, &output, &input);
-	if (!filter || !hlua_filter_from_payload(filter))
+	if (!filter || !hlua_filter_from_payload(filter, msg->chn))
 		WILL_LJMP(lua_error(L));
 
 	offset = output;
@@ -7719,7 +7721,7 @@ __LJMP static int hlua_http_msg_del_data(lua_State *L)
 		WILL_LJMP(lua_error(L));
 
 	filter = hlua_http_msg_filter(L, 1, msg, &output, &input);
-	if (!filter || !hlua_filter_from_payload(filter))
+	if (!filter || !hlua_filter_from_payload(filter, msg->chn))
 		WILL_LJMP(lua_error(L));
 
 	offset = output;
@@ -7780,7 +7782,7 @@ __LJMP static int hlua_http_msg_set_data(lua_State *L)
 
 	str = MAY_LJMP(luaL_checklstring(L, 2, &sz));
 	filter = hlua_http_msg_filter(L, 1, msg, &output, &input);
-	if (!filter || !hlua_filter_from_payload(filter))
+	if (!filter || !hlua_filter_from_payload(filter, msg->chn))
 		WILL_LJMP(lua_error(L));
 
 	offset = output;
@@ -7844,7 +7846,7 @@ __LJMP static int hlua_http_msg_send(lua_State *L)
 
 	str = MAY_LJMP(luaL_checklstring(L, 2, &sz));
 	filter = hlua_http_msg_filter(L, 1, msg, &offset, &len);
-	if (!filter || !hlua_filter_from_payload(filter))
+	if (!filter || !hlua_filter_from_payload(filter, msg->chn))
 		WILL_LJMP(lua_error(L));
 
 	/* Return an error if the channel's output is closed */
@@ -7894,7 +7896,7 @@ __LJMP static int hlua_http_msg_forward(lua_State *L)
 
 	fwd = MAY_LJMP(luaL_checkinteger(L, 2));
 	filter = hlua_http_msg_filter(L, 1, msg, &offset, &len);
-	if (!filter || !hlua_filter_from_payload(filter))
+	if (!filter || !hlua_filter_from_payload(filter, msg->chn))
 		WILL_LJMP(lua_error(L));
 
 	/* Nothing to do, just return */
@@ -12721,11 +12723,18 @@ static void hlua_filter_delete(struct stream *s, struct filter *filter)
 	filter->ctx = NULL;
 }
 
-static int hlua_filter_from_payload(struct filter *filter)
+/* Returns true if the filter is currently processing the payload of the
+ * channel <chn>, from its http_payload or tcp_payload callback. This is the
+ * only context where the data of a channel may be manipulated from lua. The
+ * payload-processing phase is tracked per channel: when a filter processes
+ * the payload of the request, it must not be allowed to manipulate the data
+ * of the response while it is analyzed, and reciprocally.
+ */
+static int hlua_filter_from_payload(struct filter *filter, struct channel *chn)
 {
 	struct hlua_flt_ctx *flt_ctx = filter->ctx;
 
-	return (flt_ctx && !!(flt_ctx->flags & HLUA_FLT_CTX_FL_PAYLOAD));
+	return (flt_ctx && !!(flt_ctx->flags & HLUA_FLT_CTX_FL_PAYLOAD_BIT(CHN_IDX(chn))));
 }
 
 /* Arm the wake-up date set by a lua filter callback on the stream task: the
@@ -12921,7 +12930,7 @@ static int  hlua_filter_start_analyze(struct stream *s, struct filter *filter, s
 {
 	struct hlua_flt_ctx *flt_ctx = filter->ctx;
 
-	flt_ctx->flags = 0;
+	flt_ctx->flags &= ~HLUA_FLT_CTX_FL_PAYLOAD_BIT(CHN_IDX(chn));
 	return hlua_filter_callback(s, filter, "start_analyze",
 				    (!(chn->flags & CF_ISRESP) ? SMP_OPT_DIR_REQ : SMP_OPT_DIR_RES),
 				    (HLUA_FLT_CB_FINAL | HLUA_FLT_CB_RETVAL | HLUA_FLT_CB_ARG_CHN));
@@ -12931,7 +12940,7 @@ static int  hlua_filter_end_analyze(struct stream *s, struct filter *filter, str
 {
 	struct hlua_flt_ctx *flt_ctx = filter->ctx;
 
-	flt_ctx->flags &= ~HLUA_FLT_CTX_FL_PAYLOAD;
+	flt_ctx->flags &= ~HLUA_FLT_CTX_FL_PAYLOAD_BIT(CHN_IDX(chn));
 	return hlua_filter_callback(s, filter, "end_analyze",
 				    (!(chn->flags & CF_ISRESP) ? SMP_OPT_DIR_REQ : SMP_OPT_DIR_RES),
 				    (HLUA_FLT_CB_FINAL | HLUA_FLT_CB_RETVAL | HLUA_FLT_CB_ARG_CHN));
@@ -12941,7 +12950,7 @@ static int  hlua_filter_http_headers(struct stream *s, struct filter *filter, st
 {
 	struct hlua_flt_ctx *flt_ctx = filter->ctx;
 
-	flt_ctx->flags &= ~HLUA_FLT_CTX_FL_PAYLOAD;
+	flt_ctx->flags &= ~HLUA_FLT_CTX_FL_PAYLOAD_BIT(CHN_IDX(msg->chn));
 	return hlua_filter_callback(s, filter, "http_headers",
 				    (!(msg->chn->flags & CF_ISRESP) ? SMP_OPT_DIR_REQ : SMP_OPT_DIR_RES),
 				    (HLUA_FLT_CB_FINAL | HLUA_FLT_CB_RETVAL | HLUA_FLT_CB_ARG_HTTP_MSG));
@@ -12959,7 +12968,7 @@ static int  hlua_filter_http_payload(struct stream *s, struct filter *filter, st
 	flt_hlua = flt_ctx->hlua[idx];
 	flt_ctx->cur_off[idx] = offset;
 	flt_ctx->cur_len[idx] = len;
-	flt_ctx->flags |= HLUA_FLT_CTX_FL_PAYLOAD;
+	flt_ctx->flags |= HLUA_FLT_CTX_FL_PAYLOAD_BIT(idx);
 	ret = hlua_filter_callback(s, filter, "http_payload", dir, (HLUA_FLT_CB_FINAL | HLUA_FLT_CB_ARG_HTTP_MSG));
 	if (ret != -1) {
 		ret = flt_ctx->cur_len[idx];
@@ -12977,7 +12986,7 @@ static int  hlua_filter_http_end(struct stream *s, struct filter *filter, struct
 {
 	struct hlua_flt_ctx *flt_ctx = filter->ctx;
 
-	flt_ctx->flags &= ~HLUA_FLT_CTX_FL_PAYLOAD;
+	flt_ctx->flags &= ~HLUA_FLT_CTX_FL_PAYLOAD_BIT(CHN_IDX(msg->chn));
 	return hlua_filter_callback(s, filter, "http_end",
 				    (!(msg->chn->flags & CF_ISRESP) ? SMP_OPT_DIR_REQ : SMP_OPT_DIR_RES),
 				    (HLUA_FLT_CB_FINAL | HLUA_FLT_CB_RETVAL | HLUA_FLT_CB_ARG_HTTP_MSG));
@@ -12995,7 +13004,7 @@ static int  hlua_filter_tcp_payload(struct stream *s, struct filter *filter, str
 	flt_hlua = flt_ctx->hlua[idx];
 	flt_ctx->cur_off[idx] = offset;
 	flt_ctx->cur_len[idx] = len;
-	flt_ctx->flags |= HLUA_FLT_CTX_FL_PAYLOAD;
+	flt_ctx->flags |= HLUA_FLT_CTX_FL_PAYLOAD_BIT(idx);
 	ret = hlua_filter_callback(s, filter, "tcp_payload", dir, (HLUA_FLT_CB_FINAL | HLUA_FLT_CB_ARG_CHN));
 	if (ret != -1) {
 		ret = flt_ctx->cur_len[idx];
