@@ -534,6 +534,8 @@ void qcc_set_error(struct qcc *qcc, int err, int app)
 /* Returns the number of streams which can still be opened until flow-control limit. */
 int qcc_fctl_avail_streams(const struct qcc *qcc, int bidi)
 {
+	uint64_t diff;
+
 	if (bidi) {
 		/* TODO */
 		return 0;
@@ -541,8 +543,11 @@ int qcc_fctl_avail_streams(const struct qcc *qcc, int bidi)
 	else {
 		const uint64_t next = qcc->next_uni_l / 4;
 		BUG_ON(qcc->rfctl.ms_uni < next);
-		return qcc->rfctl.ms_uni - next;
+		diff = qcc->rfctl.ms_uni - next;
 	}
+
+	/* cap the value to INT_MAX to avoid overflow */
+	return MIN(diff, INT_MAX);
 }
 
 /* Open a locally initiated stream for the connection <qcc>. Set <bidi> for a
