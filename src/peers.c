@@ -2341,6 +2341,7 @@ static inline int peer_treat_definemsg(struct appctx *appctx, struct peer *p,
 	}
 
 	if (table_type < 0 || table_type >= PEER_KT_TYPES) {
+		p->remote_table = NULL;
 		TRACE_PROTO("ignore table definition message: unknown table type", PEERS_EV_DEFMSG, appctx, p);
 		goto ignore_msg;
 	}
