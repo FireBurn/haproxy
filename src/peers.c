@@ -1039,6 +1039,7 @@ static int peer_prepare_ackmsg(char *msg, size_t size, struct peer_prep_params *
 void __peer_session_deinit(struct peer *peer)
 {
 	struct peers *peers = peer->peers;
+	struct shared_table *st;
 	int thr;
 
 	if (!peers || !peer->appctx)
@@ -1057,6 +1058,14 @@ void __peer_session_deinit(struct peer *peer)
 	/* Re-init current table pointers to force announcement on re-connect */
 	peer->remote_table = peer->last_local_table = peer->stop_local_table = NULL;
 	peer->appctx = NULL;
+
+	/* table definitions received from the peer are only valid for the
+	 * session's duration.
+	 */
+	for (st = peer->tables; st; st = st->next) {
+		st->remote_id = 0;
+		st->remote_data = 0;
+	}
 
         /* reset teaching flags to 0 */
         peer->flags &= ~PEER_TEACH_FLAGS;
@@ -2257,7 +2266,8 @@ static inline int peer_treat_switchmsg(struct appctx *appctx, struct peer *p,
 
 	p->remote_table = NULL;
 	for (st = p->tables; st; st = st->next) {
-		if (st->remote_id == table_id) {
+		/* 0 is the ID of tables not defined by the peer */
+		if (table_id && st->remote_id == table_id) {
 			p->remote_table = st;
 			break;
 		}
