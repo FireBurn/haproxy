@@ -1659,11 +1659,19 @@ void qcc_reset_stream(struct qcs *qcs, int err)
 	if (conn_is_back(qcs->qcc->conn))
 		qcs_idle_open(qcs);
 
+	/* Cancel emission of data not yet sent: clears not yet sent buffered
+	 * data and subtract this amount from the connection flow control.
+	 */
 	if (diff) {
 		const int soft_blocked = qfctl_sblocked(&qcc->tx.fc);
+		struct buffer *out = qc_stream_buf_get(qcs->stream);
 
 		/* Soft offset cannot be inferior to real one. */
 		BUG_ON(qcc->tx.fc.off_soft - diff < qcc->tx.fc.off_real);
+
+		/* Remove prepared data not yet sent. */
+		b_sub(out, diff);
+		qcs->flags &= ~QC_SF_FIN_STREAM;
 
 		/* Subtract to conn flow control data amount prepared on stream not yet sent. */
 		qcc->tx.fc.off_soft -= diff;
