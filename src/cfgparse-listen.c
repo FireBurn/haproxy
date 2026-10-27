@@ -1101,6 +1101,8 @@ int cfg_parse_listen(const char *file, int linenum, char **args, int kwm)
 		curproxy->max_out_conns = atoi(args[1]);
 	}
 	else if (strcmp(args[0], "capture") == 0) {
+		long len;
+
 		if (warnifnotcap(curproxy, PR_CAP_FE, file, linenum, args[0], NULL))
 			err_code |= ERR_WARN;
 
@@ -1120,12 +1122,20 @@ int cfg_parse_listen(const char *file, int linenum, char **args, int kwm)
 				err_code |= ERR_ALERT | ERR_FATAL;
 				goto out;
 			}
+
+			len = atol(args[4]);
+			if (len < 0 || len > INT_MAX) {
+				ha_alert("parsing [%s:%d] : '%s %s': invalid length '%s'.", file, linenum, args[0], args[1], args[4]);
+				err_code |= ERR_ALERT | ERR_FATAL;
+				goto out;
+			}
+
 			free(curproxy->capture_name);
 			curproxy->capture_name = strdup(args[2]);
 			if (!curproxy->capture_name)
 				goto alloc_error;
 			curproxy->capture_namelen = strlen(curproxy->capture_name);
-			curproxy->capture_len = atol(args[4]);
+			curproxy->capture_len = len;
 			curproxy->to_log |= LW_COOKIE;
 		}
 		else if (strcmp(args[1], "request") == 0 && strcmp(args[2], "header") == 0) {
@@ -1147,6 +1157,13 @@ int cfg_parse_listen(const char *file, int linenum, char **args, int kwm)
 				goto out;
 			}
 
+			len = atol(args[5]);
+			if (len < 0 || len >= INT_MAX) {
+				ha_alert("parsing [%s:%d] : '%s %s %s': invalid length '%s'.", file, linenum, args[0], args[1], args[2], args[5]);
+				err_code |= ERR_ALERT | ERR_FATAL;
+				goto out;
+			}
+
 			hdr = calloc(1, sizeof(*hdr));
 			if (!hdr)
 				goto req_caphdr_alloc_error;
@@ -1155,7 +1172,7 @@ int cfg_parse_listen(const char *file, int linenum, char **args, int kwm)
 			if (!hdr->name)
 				goto req_caphdr_alloc_error;
 			hdr->namelen = strlen(args[3]);
-			hdr->len = atol(args[5]);
+			hdr->len = len;
 			hdr->pool = create_pool("caphdr", hdr->len + 1, MEM_F_SHARED);
 			if (!hdr->pool) {
 			  req_caphdr_alloc_error:
