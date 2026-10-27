@@ -3126,7 +3126,7 @@ static enum act_parse_ret parse_inc_gpc(const char **args, int *arg, struct prox
 				return ACT_RET_PRS_ERR;
 			}
 
-			if (rule->arg.gpc.sc >= global.tune.nb_stk_ctr) {
+			if (rule->arg.gpc.sc < 0 || rule->arg.gpc.sc >= global.tune.nb_stk_ctr) {
 				memprintf(err, "invalid stick table track ID '%s'. The max allowed ID is %d (tune.stick-counters)",
 				          args[*arg-1], global.tune.nb_stk_ctr-1);
 				return ACT_RET_PRS_ERR;
@@ -3154,7 +3154,7 @@ static enum act_parse_ret parse_inc_gpc(const char **args, int *arg, struct prox
 				return ACT_RET_PRS_ERR;
 			}
 
-			if (rule->arg.gpc.sc >= global.tune.nb_stk_ctr) {
+			if (rule->arg.gpc.sc < 0 || rule->arg.gpc.sc >= global.tune.nb_stk_ctr) {
 				memprintf(err, "invalid stick table track ID. The max allowed ID is %d (tune.stick-counters)",
 				          global.tune.nb_stk_ctr-1);
 				return ACT_RET_PRS_ERR;
@@ -3356,7 +3356,7 @@ static enum act_parse_ret parse_set_gpt(const char **args, int *arg, struct prox
 				return ACT_RET_PRS_ERR;
 			}
 
-			if (rule->arg.gpt.sc >= global.tune.nb_stk_ctr) {
+			if (rule->arg.gpt.sc < 0 || rule->arg.gpt.sc >= global.tune.nb_stk_ctr) {
 				memprintf(err, "invalid stick table track ID '%s'. The max allowed ID is %d",
 				          args[*arg-1], global.tune.nb_stk_ctr-1);
 				return ACT_RET_PRS_ERR;
@@ -3382,7 +3382,7 @@ static enum act_parse_ret parse_set_gpt(const char **args, int *arg, struct prox
 				return ACT_RET_PRS_ERR;
 			}
 
-			if (rule->arg.gpt.sc >= global.tune.nb_stk_ctr) {
+			if (rule->arg.gpt.sc < 0 || rule->arg.gpt.sc >= global.tune.nb_stk_ctr) {
 				memprintf(err, "invalid stick table track ID '%s'. The max allowed ID is %d",
 				          args[*arg-1], global.tune.nb_stk_ctr-1);
 				return ACT_RET_PRS_ERR;
@@ -3549,7 +3549,7 @@ static enum act_parse_ret parse_add_gpc(const char **args, int *arg, struct prox
 			return ACT_RET_PRS_ERR;
 		}
 
-		if (rule->arg.gpc.sc >= global.tune.nb_stk_ctr) {
+		if (rule->arg.gpc.sc < 0 || rule->arg.gpc.sc >= global.tune.nb_stk_ctr) {
 			memprintf(err, "invalid stick table track ID '%s'. The max allowed ID is %d (tune.stick-counters)",
 				  args[*arg-1], global.tune.nb_stk_ctr - 1);
 			return ACT_RET_PRS_ERR;
