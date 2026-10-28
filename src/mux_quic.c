@@ -2762,8 +2762,6 @@ static int qmux_init(struct connection *conn, struct proxy *prx,
 	qcc_reset_idle_start(qcc);
 	LIST_INIT(&qcc->opening_list);
 
-	HA_ATOMIC_STORE(&conn->handle.qc->qcc, qcc);
-
 	if (qcc_install_app_ops(qcc, conn->handle.qc->app_ops)) {
 		TRACE_PROTO("Cannot install app layer", QMUX_EV_QCC_NEW|QMUX_EV_QCC_ERR, qcc->conn);
 		/* prepare a CONNECTION_CLOSE frame */
@@ -2802,6 +2800,8 @@ static int qmux_init(struct connection *conn, struct proxy *prx,
 			qcc->flags |= QC_CF_WAIT_HS;
 		}
 	}
+
+	HA_ATOMIC_STORE(&conn->handle.qc->qcc, qcc);
 
 	TRACE_LEAVE(QMUX_EV_QCC_NEW, qcc->conn);
 	return 0;
