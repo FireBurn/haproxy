@@ -298,9 +298,13 @@ static void qcc_refresh_timeout(struct qcc *qcc)
 		}
 		else {
 			if (qcc->flags & QC_CF_APP_SHUT) {
+				/* Schedule shut-timeout once and do not reset it after. It is
+				 * expected that if set this value is shorter than the default
+				 * timeout, so that the connection will quickly end.
+				 */
 				TRACE_DEVEL("connection in closing", QMUX_EV_QCC_WAKE, qcc->conn);
-				qcc->task->expire = tick_add_ifset(now_ms,
-				                                   qcc->shut_timeout);
+				qcc->task->expire = tick_first(qcc->task->expire,
+							       tick_add_ifset(now_ms, qcc->shut_timeout));
 			}
 			else {
 				/* Use http-request timeout if keep-alive timeout not set */
