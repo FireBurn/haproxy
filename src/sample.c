@@ -2645,6 +2645,8 @@ static int sample_conv_us_ltime(const struct arg *args, struct sample *smp, void
 	ns = (date % 1000000) * 1000; /*  us part to ns */
 
 	temp = conv_time_common(args[0].data.str.area, curr_date, ns, 1);
+	if (!temp)
+		return 0;
 	smp->data.u.str = *temp;
 	smp->data.type = SMP_T_STR;
 	return 1;
@@ -2668,6 +2670,8 @@ static int sample_conv_ms_ltime(const struct arg *args, struct sample *smp, void
 	ns = (date % 1000) * 1000000; /*  ms part to ns */
 
 	temp = conv_time_common(args[0].data.str.area, curr_date, ns, 1);
+	if (!temp)
+		return 0;
 	smp->data.u.str = *temp;
 	smp->data.type = SMP_T_STR;
 	return 1;
@@ -2727,6 +2731,8 @@ static int sample_conv_us_utime(const struct arg *args, struct sample *smp, void
 	ns = (date % 1000000) * 1000; /*  us part to ns */
 
 	temp = conv_time_common(args[0].data.str.area, curr_date, ns, 0);
+	if (!temp)
+		return 0;
 	smp->data.u.str = *temp;
 	smp->data.type = SMP_T_STR;
 	return 1;
@@ -2750,6 +2756,8 @@ static int sample_conv_ms_utime(const struct arg *args, struct sample *smp, void
 	ns = (date % 1000) * 1000000; /*  ms part to ns */
 
 	temp = conv_time_common(args[0].data.str.area, curr_date, ns, 0);
+	if (!temp)
+		return 0;
 	smp->data.u.str = *temp;
 	smp->data.type = SMP_T_STR;
 	return 1;
