@@ -3893,8 +3893,6 @@ static int qmux_init(struct connection *conn, struct proxy *prx,
 	qcc_reset_idle_start(qcc);
 	LIST_INIT(&qcc->opening_list);
 
-	HA_ATOMIC_STORE(&conn->handle.qc->qcc, qcc);
-
 	/* Register conn as app_ops may use it. */
 	qcc->conn = conn;
 
@@ -3969,6 +3967,8 @@ static int qmux_init(struct connection *conn, struct proxy *prx,
 		qcc->nb_sc++;
 		qcc->tot_sc++;
 	}
+
+	HA_ATOMIC_STORE(&conn->handle.qc->qcc, qcc);
 
 	TRACE_LEAVE(QMUX_EV_QCC_NEW, conn);
 	return 0;
