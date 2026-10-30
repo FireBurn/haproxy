@@ -8203,8 +8203,12 @@ struct http_hdr *hlua_httpclient_table_to_hdrs(lua_State *L)
 			}
 
 			if (hdr_num >= global.tune.max_http_hdr) {
-				lua_pop(L, 2);
-				goto skip_headers;
+				while (hdr_num--) {
+					istfree(&hdrs[hdr_num].n);
+					istfree(&hdrs[hdr_num].v);
+				}
+				WILL_LJMP(luaL_error(L, "too many headers (tune.http.maxhdr is %d)",
+						     global.tune.max_http_hdr));
 			}
 
 			v = lua_tolstring(L, -1, &vlen);
@@ -8397,7 +8401,7 @@ __LJMP static int hlua_httpclient_send(lua_State *L, enum http_meth_t meth)
 		} else if (strcmp(lua_tostring(L, -2), "headers") == 0) {
 			if (lua_type(L, -1) != LUA_TTABLE)
 				WILL_LJMP(luaL_error(L, "invalid parameter in 'headers', must be a table"));
-			hdrs = hlua_httpclient_table_to_hdrs(L);
+			hdrs = MAY_LJMP(hlua_httpclient_table_to_hdrs(L));
 
 		} else if (strcmp(lua_tostring(L, -2), "body") == 0) {
 			if (lua_type(L, -1) != LUA_TSTRING)
