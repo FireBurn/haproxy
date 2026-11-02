@@ -2730,8 +2730,15 @@ static void cli_release_commit_cert(struct appctx *appctx)
 
 	HA_SPIN_UNLOCK(CKCH_LOCK, &ckch_lock);
 	/* free every new sni_ctx and the new store, which are not in the trees so no spinlock there */
-	if (ctx->new_ckchs)
+	if (ctx->new_ckchs) {
+		/* the transaction is over with its store, which is freed below,
+		 * e.g. if the client left before the end of the commit
+		 */
+		ckchs_transaction.new_ckchs = NULL;
+		ckchs_transaction.old_ckchs = NULL;
+		ckchs_transaction.path = NULL;
 		ckch_store_free(ctx->new_ckchs);
+	}
 	ha_free(&ctx->err);
 }
 
