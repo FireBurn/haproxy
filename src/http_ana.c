@@ -2876,7 +2876,7 @@ resume_execution:
 
 		/* Always call the action function if defined */
 		if (rule->action_ptr) {
-			if ((s->scf->flags & SC_FL_ERROR) ||
+			if ((s->scf->flags & SC_FL_ERROR) || (s->scb->flags & SC_FL_ERROR) ||
 			    ((s->scf->flags & (SC_FL_EOS)) &&
 			     (px->options & PR_O_ABRT_CLOSE)))
 				act_opts |= ACT_OPT_FINAL;
