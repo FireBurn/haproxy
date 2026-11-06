@@ -4941,7 +4941,20 @@ static void h2_detach(struct sedesc *sd)
 
 	h2s_destroy(h2s);
 
-	if (h2c->flags & H2_CF_IS_BACK && !h2c_is_dead(h2c)) {
+	/* Don't close unless the last stream is gone and either the
+	 * connection is in error, or it reached the ID already specified in
+	 * a GOAWAY frame received or sent (h2c_is_dead() documents this).
+	 */
+	if (h2c_is_dead(h2c)) {
+		TRACE_DEVEL("leaving and killing dead connection", H2_EV_STRM_END, h2c->conn);
+		h2_release(h2c);
+		return;
+	}
+
+	/* A stream left, refresh the timeout if necessary. */
+	h2c_update_timeout(h2c);
+
+	if (h2c->flags & H2_CF_IS_BACK) {
 		if (!(h2c->flags & (H2_CF_RCVD_SHUT|H2_CF_ERR_PENDING|H2_CF_ERROR))) {
 			if (h2c->conn->flags & CO_FL_PRIVATE) {
 				/* Add the connection in the session server list, if not already done */
@@ -5004,22 +5017,7 @@ static void h2_detach(struct sedesc *sd)
 		}
 	}
 
-	/* We don't want to close right now unless we're removing the
-	 * last stream, and either the connection is in error, or it
-	 * reached the ID already specified in a GOAWAY frame received
-	 * or sent (as seen by last_sid >= 0).
-	 */
-	if (h2c_is_dead(h2c)) {
-		/* no more stream will come, kill it now */
-		TRACE_DEVEL("leaving and killing dead connection", H2_EV_STRM_END, h2c->conn);
-		h2_release(h2c);
-	}
-	else if (h2c->task) {
-		h2c_update_timeout(h2c);
-		TRACE_DEVEL("leaving, refreshing connection's timeout", H2_EV_STRM_END, h2c->conn);
-	}
-	else
-		TRACE_DEVEL("leaving", H2_EV_STRM_END, h2c->conn);
+	TRACE_DEVEL("leaving", H2_EV_STRM_END, h2c->conn);
 }
 
 /* Performs a synchronous or asynchronous shutr(). */
