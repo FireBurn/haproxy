@@ -1500,7 +1500,10 @@ cfg_parse_users(const char *file, int linenum, char **args, int kwm)
 		while (*args[cur_arg]) {
 			if (strcmp(args[cur_arg], "password") == 0) {
 #ifdef USE_LIBCRYPT
-				if (!crypt("", args[cur_arg + 1])) {
+				char *hash;
+
+				hash = crypt("", args[cur_arg + 1]);
+				if (!hash || hash[0] == '*') {
 					ha_alert("parsing [%s:%d]: the encrypted password used for user '%s' is not supported by crypt(3).\n",
 						 file, linenum, newuser->user);
 					err_code |= ERR_ALERT | ERR_FATAL;
