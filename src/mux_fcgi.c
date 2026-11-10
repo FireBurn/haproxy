@@ -3696,6 +3696,83 @@ static void fcgi_destroy(void *ctx)
 	}
 }
 
+/* Performs the idle/avail list management of a backend connection after one
+ * of its streams was destroyed. It is called from fcgi_detach(), and from
+ * fcgi_deferred_shut() for orphaned streams that were blocked at detach time.
+ * The connection must not be dead and its timeout must already have been
+ * refreshed. <sess> is the session owning the connection if it is private. It
+ * may be NULL if the session is already gone, in which case an idle private
+ * connection cannot be reused anymore and is destroyed.
+ *
+ * Returns 1 if the connection was moved to an idle list or destroyed, in which
+ * case the caller must not use <fconn> anymore. Otherwise 0 is returned.
+ */
+static int fcgi_may_idle_conn(struct fcgi_conn *fconn, struct session *sess)
+{
+	if ((fconn->conn->flags & (CO_FL_ERROR|CO_FL_SOCK_RD_SH|CO_FL_SOCK_WR_SH)) ||
+	    (fconn->state == FCGI_CS_CLOSED) ||
+	    !(fconn->flags & FCGI_CF_KEEP_CONN))
+		return 0;
+
+	if (fconn->conn->flags & CO_FL_PRIVATE) {
+		/* Add the connection in the session serverlist, if not already done */
+		if (!session_add_conn(sess, fconn->conn, fconn->conn->target)) {
+			fconn->conn->owner = NULL;
+			if (eb_is_empty(&fconn->streams_by_id)) {
+				/* let's kill the connection right away */
+				fconn->conn->mux->destroy(fconn);
+				TRACE_DEVEL("outgoing connection killed", FCGI_EV_STRM_END|FCGI_EV_FCONN_ERR);
+				return 1;
+			}
+		}
+		if (eb_is_empty(&fconn->streams_by_id)) {
+			if (session_check_idle_conn(fconn->conn->owner, fconn->conn) != 0) {
+				/* The connection is destroyed, let's leave */
+				TRACE_DEVEL("outgoing connection killed", FCGI_EV_STRM_END|FCGI_EV_FCONN_ERR);
+				return 1;
+			}
+		}
+	}
+	else {
+		if (eb_is_empty(&fconn->streams_by_id)) {
+			/* If the connection is owned by the session, first remove it
+			 * from its list
+			 */
+			if (fconn->conn->owner) {
+				session_unown_conn(fconn->conn->owner, fconn->conn);
+				fconn->conn->owner = NULL;
+			}
+
+			/* mark that the tasklet may lose its context to another thread and
+			 * that the handler needs to check it under the idle conns lock.
+			 */
+			HA_ATOMIC_OR(&fconn->wait_event.tasklet->state, TASK_F_USR1);
+			xprt_set_idle(fconn->conn, fconn->conn->xprt, fconn->conn->xprt_ctx);
+
+			if (!srv_add_to_idle_list(objt_server(fconn->conn->target), fconn->conn, 1)) {
+				/* The server doesn't want it, let's kill the connection right away */
+				fconn->conn->mux->destroy(fconn);
+				TRACE_DEVEL("outgoing connection killed", FCGI_EV_STRM_END|FCGI_EV_FCONN_ERR);
+				return 1;
+			}
+			/* At this point, the connection has been added to the
+			 * server idle list, so another thread may already have
+			 * hijacked it, so we can't do anything with it.
+			 */
+			TRACE_DEVEL("reusable idle connection", FCGI_EV_STRM_END, fconn->conn);
+			return 1;
+		}
+		else if (!fconn->conn->hash_node->node.node.leaf_p &&
+			 fcgi_avail_streams(fconn->conn) > 0 && objt_server(fconn->conn->target) &&
+			 !LIST_INLIST(&fconn->conn->sess_el)) {
+			eb64_insert(&__objt_server(fconn->conn->target)->per_thr[tid].avail_conns,
+				    &fconn->conn->hash_node->node);
+		}
+	}
+
+	return 0;
+}
+
 /*
  * Detach the stream from the connection and possibly release the connection.
  */
@@ -3759,65 +3836,8 @@ static void fcgi_detach(struct sedesc *sd)
 	 */
 	fcgi_conn_update_timeout(fconn);
 
-	if (!(fconn->conn->flags & (CO_FL_ERROR|CO_FL_SOCK_RD_SH|CO_FL_SOCK_WR_SH)) &&
-	    (fconn->state != FCGI_CS_CLOSED) &&
-	    (fconn->flags & FCGI_CF_KEEP_CONN)) {
-		if (fconn->conn->flags & CO_FL_PRIVATE) {
-			/* Add the connection in the session serverlist, if not already done */
-			if (!session_add_conn(sess, fconn->conn, fconn->conn->target)) {
-				fconn->conn->owner = NULL;
-				if (eb_is_empty(&fconn->streams_by_id)) {
-					/* let's kill the connection right away */
-					fconn->conn->mux->destroy(fconn);
-					TRACE_DEVEL("outgoing connection killed", FCGI_EV_STRM_END|FCGI_EV_FCONN_ERR);
-					return;
-				}
-			}
-			if (eb_is_empty(&fconn->streams_by_id)) {
-				if (session_check_idle_conn(fconn->conn->owner, fconn->conn) != 0) {
-					/* The connection is destroyed, let's leave */
-					TRACE_DEVEL("outgoing connection killed", FCGI_EV_STRM_END|FCGI_EV_FCONN_ERR);
-					return;
-				}
-			}
-		}
-		else {
-			if (eb_is_empty(&fconn->streams_by_id)) {
-				/* If the connection is owned by the session, first remove it
-				 * from its list
-				 */
-				if (fconn->conn->owner) {
-					session_unown_conn(fconn->conn->owner, fconn->conn);
-					fconn->conn->owner = NULL;
-				}
-
-				/* mark that the tasklet may lose its context to another thread and
-				 * that the handler needs to check it under the idle conns lock.
-				 */
-				HA_ATOMIC_OR(&fconn->wait_event.tasklet->state, TASK_F_USR1);
-				xprt_set_idle(fconn->conn, fconn->conn->xprt, fconn->conn->xprt_ctx);
-
-				if (!srv_add_to_idle_list(objt_server(fconn->conn->target), fconn->conn, 1)) {
-					/* The server doesn't want it, let's kill the connection right away */
-					fconn->conn->mux->destroy(fconn);
-					TRACE_DEVEL("outgoing connection killed", FCGI_EV_STRM_END|FCGI_EV_FCONN_ERR);
-					return;
-				}
-				/* At this point, the connection has been added to the
-				 * server idle list, so another thread may already have
-				 * hijacked it, so we can't do anything with it.
-				 */
-				TRACE_DEVEL("reusable idle connection", FCGI_EV_STRM_END, fconn->conn);
-				return;
-			}
-			else if (!fconn->conn->hash_node->node.node.leaf_p &&
-				 fcgi_avail_streams(fconn->conn) > 0 && objt_server(fconn->conn->target) &&
-				 !LIST_INLIST(&fconn->conn->sess_el)) {
-				eb64_insert(&__objt_server(fconn->conn->target)->per_thr[tid].avail_conns,
-				            &fconn->conn->hash_node->node);
-			}
-		}
-	}
+	if (fcgi_may_idle_conn(fconn, sess))
+		return;
 
 	/* We don't want to close right now unless we're removing the last
 	 * stream and the connection is in error.
@@ -3967,8 +3987,24 @@ struct task *fcgi_deferred_shut(struct task *t, void *ctx, unsigned int state)
 
 		if (!fcgi_strm_sc(fstrm)) {
 			fcgi_strm_destroy(fstrm);
-			if (fcgi_conn_is_dead(fconn))
+			if (fcgi_conn_is_dead(fconn)) {
 				fcgi_release(fconn);
+				goto end;
+			}
+
+			/* A stream left, refresh the timeout if necessary. */
+			fcgi_conn_update_timeout(fconn);
+
+			/* The stream was blocked in fcgi_detach() which left
+			 * before the connection could be made idle or available
+			 * again, let's do it now. The stream's session cannot be
+			 * used here because it may have been released in the
+			 * mean time. The connection owner is only reliable if the
+			 * connection is still attached to its session, because
+			 * session_free() only resets it in this case.
+			 */
+			if (fcgi_may_idle_conn(fconn, (LIST_INLIST(&fconn->conn->sess_el) ? fconn->conn->owner : NULL)))
+				goto end;
 		}
 	}
  end:
