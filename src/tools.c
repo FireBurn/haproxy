@@ -7812,19 +7812,24 @@ out:
 }
 
 /*
- * free() an array of strings terminated by a NULL entry
- * set the pointer to NULL
+ * Free a NULL-terminated array of strings, including the array itself,
+ * and set the pointer to NULL. Both array == NULL and *array == NULL are safe.
  */
 void ha_freearray(char ***array)
 {
 	int i;
-	char **r = *array;
+	char **r;
+
+	if (!array)
+		return;
+
+	r = *array;
 
 	for (i = 0; r && r[i]; i++) {
 		free(r[i]);
 		r[i] = NULL;
 	}
-	*array = NULL;
+	ha_free(array);
 }
 
 /* Optionally appends the thread execution context as a string to the output,
