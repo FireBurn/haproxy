@@ -1127,6 +1127,13 @@ static ssize_t h3_decode_qcs(struct qcs *qcs, struct buffer *b, int fin)
 			return -1;
 		}
 
+		/* No header seen, HTTP message is malformed. */
+		if (quic_stream_is_bidi(qcs->id) && h3s->st_req == H3S_ST_REQ_BEFORE) {
+			TRACE_ERROR("incomplete request/response closed with standalone FIN", H3_EV_RX_FRAME, qcs->qcc->conn, qcs);
+			qcc_emit_cc_app(qcs->qcc, H3_REQUEST_INCOMPLETE, 1);
+			return -1;
+		}
+
 		qcs_http_handle_standalone_fin(qcs);
 		return 0;
 	}
