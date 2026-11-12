@@ -1944,6 +1944,12 @@ static int parse_cache_rule(struct proxy *proxy, const char *name, struct act_ru
 		goto err;
 	}
 
+	if (proxy->cap & PR_CAP_DEF) {
+		memprintf(err, "'%s' rules are not supported in a defaults section",
+			  rule->kw ? rule->kw->kw : "cache");
+		return 0;
+	}
+
 	/* check if a cache filter was already registered with this cache
 	 * name, if that's the case, must use it. */
 	list_for_each_entry(fconf, &proxy->filter_configs, list) {
