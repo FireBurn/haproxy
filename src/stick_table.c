@@ -99,17 +99,6 @@ struct stktable *stktable_find_by_name(const char *name)
  */
 void __stksess_free(struct stktable *t, struct stksess *ts)
 {
-	HA_ATOMIC_DEC(&t->current);
-	pool_free(t->pool, (void *)ts - round_ptr_size(t->data_size));
-}
-
-/*
- * Free an allocated sticky session <ts>, and decrease sticky sessions counter
- * in table <t>.
- * This function locks the table
- */
-void stksess_free(struct stktable *t, struct stksess *ts)
-{
 	uint shard;
 	size_t len;
 	void *data;
@@ -130,6 +119,17 @@ void stksess_free(struct stktable *t, struct stksess *ts)
 	/* make the compiler happy when shard is not used without threads */
 	ALREADY_CHECKED(shard);
 
+	HA_ATOMIC_DEC(&t->current);
+	pool_free(t->pool, (void *)ts - round_ptr_size(t->data_size));
+}
+
+/*
+ * Free an allocated sticky session <ts>, and decrease sticky sessions counter
+ * in table <t>.
+ * This function locks the table
+ */
+void stksess_free(struct stktable *t, struct stksess *ts)
+{
 	__stksess_free(t, ts);
 }
 
