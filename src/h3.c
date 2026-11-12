@@ -1515,6 +1515,16 @@ static ssize_t h3_rcv_buf(struct qcs *qcs, struct buffer *b, int fin)
 		}
 
 		if (quic_stream_is_bidi(qcs->id)) {
+			/* No header seen, HTTP message is malformed. */
+			if (h3s->st_req == H3S_ST_REQ_BEFORE) {
+				const int code = !conn_is_back(qcs->qcc->conn) ? H3_ERR_REQUEST_INCOMPLETE : H3_ERR_MESSAGE_ERROR;
+				TRACE_ERROR("incomplete request/response closed with standalone FIN", H3_EV_RX_FRAME, qcs->qcc->conn, qcs);
+				qcc_abort_stream_read(qcs);
+				qcc_reset_stream(qcs, code);
+				qcc_report_glitch(qcs->qcc, 1);
+				goto done;
+			}
+
 			if (!(appbuf = qcc_get_stream_rxbuf(qcs))) {
 				TRACE_ERROR("data buffer alloc failure", H3_EV_RX_FRAME, qcs->qcc->conn, qcs);
 				qcc_set_error(qcs->qcc, H3_ERR_INTERNAL_ERROR, 1);
