@@ -3124,6 +3124,9 @@ static int cli_io_handler_show_cache(struct appctx *appctx)
 			}
 			cache_rdunlock(cache_tree);
 		}
+
+		/* Reset the cache tree for the next cache */
+		ctx->cache_tree = NULL;
 	}
 
 	free_trash_chunk(buf);
