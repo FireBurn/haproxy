@@ -344,6 +344,19 @@ static int qc_send_ppkts(struct buffer *buf, struct ssl_sock_ctx *ctx)
 			qc->cntrs.sent_pkt++;
 
 			pkt->time_sent = time_sent;
+			/* Record the NEW_CONNECTION_ID sequence numbers as sent */
+			if (pkt->flags & QUIC_FL_TX_PACKET_NCIDS) {
+				struct quic_frame *f;
+
+				list_for_each_entry(f, &pkt->frms, list) {
+					if (f->type != QUIC_FT_NEW_CONNECTION_ID)
+						continue;
+
+					qc->max_sent_cid_seq_num =
+						QUIC_MAX(qc->max_sent_cid_seq_num,
+						         f->new_connection_id.seq_num);
+				}
+			}
 			if (pkt->flags & QUIC_FL_TX_PACKET_ACK_ELICITING) {
 				pkt->pktns->tx.time_of_last_eliciting = time_sent;
 				qc->path->ifae_pkts++;

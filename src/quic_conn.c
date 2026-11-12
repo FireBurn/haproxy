@@ -1141,6 +1141,8 @@ struct quic_conn *qc_new_conn(const struct quic_version *qv, int ipv4,
 	/* Required to safely call quic_conn_prx_cntrs_update() from quic_conn_release(). */
 	qc->prx_counters = NULL;
 
+	qc->max_sent_cid_seq_num = 0;
+
 	/* QUIC Server (or listener). */
 	if (server) {
 		cc_algo = l->bind_conf->quic_cc_algo;
