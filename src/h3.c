@@ -1590,7 +1590,8 @@ static ssize_t h3_decode_qcs(struct qcs *qcs, struct buffer *b, int fin)
 
 				/* No header seen, HTTP message is malformed. */
 				if (h3s->st_req == H3S_ST_REQ_BEFORE) {
-					TRACE_ERROR("malformed request closed by unknown frame without any header", H3_EV_RX_FRAME, qcs->qcc->conn, qcs);
+					TRACE_ERROR("incomplete request/response closed by unknown frame", H3_EV_RX_FRAME, qcs->qcc->conn, qcs);
+					h3s->err = !conn_is_back(qcs->qcc->conn) ? H3_REQUEST_INCOMPLETE : H3_MESSAGE_ERROR;
 					h3s->err = H3_MESSAGE_ERROR;
 					ret = -1;
 				}
