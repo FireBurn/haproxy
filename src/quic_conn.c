@@ -1165,6 +1165,7 @@ struct quic_conn *qc_new_conn(const struct quic_version *qv, int ipv4,
 	}
 	*qc->cids = EB_ROOT;
 	qc->next_cid_seq_num = 0;
+	qc->max_sent_cid_seq_num = 0;
 
 	/* QUIC Server (or listener). */
 	if (server) {
