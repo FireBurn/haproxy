@@ -1023,9 +1023,9 @@ static ssize_t h3_trailers_to_htx(struct qcs *qcs, const struct buffer *buf,
 	tailblk = htx_get_tail_blk(htx);
 
 	/* Do not decode trailers if there is remaining data left, for similar
-	 * reasons as h3_resp_headers_to_htx().
+	 * reasons as h3_resp_headers_to_htx(), unless trailer frame is empty.
 	 */
-	if (!htx_is_empty(htx)) {
+	if (len && !htx_is_empty(htx)) {
 		qcs->flags |= QC_SF_DEM_FULL;
 		len = 0;
 		goto out;
