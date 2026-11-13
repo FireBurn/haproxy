@@ -504,6 +504,7 @@ int tcp_connect_server(struct connection *conn, int flags)
 			port_range_release_port(fdinfo[fd].port_range, fdinfo[fd].local_port);
 			fdinfo[fd].port_range = NULL;
 			close(fd);
+			conn->handle.fd = DEAD_FD_MAGIC;
 
 			if (ret == 1) {
 				ha_alert("Cannot bind to source address before connect() for backend %s. Aborting.\n",
@@ -613,6 +614,7 @@ int tcp_connect_server(struct connection *conn, int flags)
 			port_range_release_port(fdinfo[fd].port_range, fdinfo[fd].local_port);
 			fdinfo[fd].port_range = NULL;
 			close(fd);
+			conn->handle.fd = DEAD_FD_MAGIC;
 			send_log(be, LOG_ERR, "Connect() failed for backend %s: %s.\n", be->id, msg);
 			conn->flags |= CO_FL_ERROR;
 			return SF_ERR_RESOURCE;
@@ -621,6 +623,7 @@ int tcp_connect_server(struct connection *conn, int flags)
 			port_range_release_port(fdinfo[fd].port_range, fdinfo[fd].local_port);
 			fdinfo[fd].port_range = NULL;
 			close(fd);
+			conn->handle.fd = DEAD_FD_MAGIC;
 			conn->err_code = CO_ER_SOCK_ERR;
 			conn->flags |= CO_FL_ERROR;
 			return SF_ERR_SRVTO;
@@ -630,6 +633,7 @@ int tcp_connect_server(struct connection *conn, int flags)
 			port_range_release_port(fdinfo[fd].port_range, fdinfo[fd].local_port);
 			fdinfo[fd].port_range = NULL;
 			close(fd);
+			conn->handle.fd = DEAD_FD_MAGIC;
 			conn->err_code = CO_ER_SOCK_ERR;
 			conn->flags |= CO_FL_ERROR;
 			return SF_ERR_SRVCL;
