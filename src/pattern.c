@@ -2243,6 +2243,9 @@ int pat_ref_read_from_file_smp(struct pat_ref *ref, char **err)
 	char *c;
 	int ret = 0;
 	int line = 0;
+	char *buf = NULL;
+	size_t buf_size = 0;
+	int rd;
 	char *key_beg;
 	char *key_end;
 	char *value_beg;
@@ -2264,9 +2267,9 @@ int pat_ref_read_from_file_smp(struct pat_ref *ref, char **err)
 	 * followed by one value per line. The start spaces, separator spaces
 	 * and and spaces are stripped. Each can contain comment started by '#'
 	 */
-	while (fgets(trash.area, trash.size, file) != NULL) {
+	while ((rd = read_line_to_mem(file, &buf, &buf_size)) > 0) {
 		line++;
-		c = trash.area;
+		c = buf;
 
 		/* ignore lines beginning with a dash */
 		if (*c == '#')
@@ -2312,6 +2315,11 @@ int pat_ref_read_from_file_smp(struct pat_ref *ref, char **err)
 		}
 	}
 
+	if (rd < 0) {
+		memprintf(err, "out of memory");
+		goto out_close;
+	}
+
 	if (ferror(file)) {
 		memprintf(err, "error encountered while reading  <%s> : %s",
 				ref->reference, strerror(errno));
@@ -2321,6 +2329,7 @@ int pat_ref_read_from_file_smp(struct pat_ref *ref, char **err)
 	ret = 1;
 
  out_close:
+	free(buf);
 	fclose(file);
 	return ret;
 }
@@ -2335,6 +2344,9 @@ int pat_ref_read_from_file(struct pat_ref *ref, char **err)
 	char *arg;
 	int ret = 0;
 	int line = 0;
+	char *buf = NULL;
+	size_t buf_size = 0;
+	int rd;
 
 	file = fopen(ref->reference, "r");
 	if (!file) {
@@ -2351,9 +2363,9 @@ int pat_ref_read_from_file(struct pat_ref *ref, char **err)
 	 * line. If the line contains spaces, they will be part of the pattern.
 	 * The pattern stops at the first CR, LF or EOF encountered.
 	 */
-	while (fgets(trash.area, trash.size, file) != NULL) {
+	while ((rd = read_line_to_mem(file, &buf, &buf_size)) > 0) {
 		line++;
-		c = trash.area;
+		c = buf;
 
 		/* ignore lines beginning with a dash */
 		if (*c == '#')
@@ -2379,6 +2391,11 @@ int pat_ref_read_from_file(struct pat_ref *ref, char **err)
 		}
 	}
 
+	if (rd < 0) {
+		memprintf(err, "out of memory when loading patterns from file <%s>", ref->reference);
+		goto out_close;
+	}
+
 	if (ferror(file)) {
 		memprintf(err, "error encountered while reading  <%s> : %s",
 				ref->reference, strerror(errno));
@@ -2387,6 +2404,7 @@ int pat_ref_read_from_file(struct pat_ref *ref, char **err)
 	ret = 1; /* success */
 
  out_close:
+	free(buf);
 	fclose(file);
 	return ret;
 }
