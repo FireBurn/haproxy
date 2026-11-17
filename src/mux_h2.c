@@ -6820,8 +6820,18 @@ static size_t h2_rcv_buf(struct stconn *sc, struct buffer *buf, size_t count, in
 	ret -= h2s_htx->data;
 
   end:
-	if (b_data(&h2s->rxbuf))
+	if (b_data(&h2s->rxbuf)) {
+		if (!buf->data) {
+			/* we have pending data and the output buf is empty,
+			 * this is typical of too large a non-fragmentable
+			 * data (e.g headers, trailers) combined with a
+			 * reserve, so this will never unblock.
+			 */
+			se_fl_set(h2s->sd, SE_FL_ERROR);
+			goto leave;
+		}
 		se_fl_set(h2s->sd, SE_FL_RCV_MORE | SE_FL_WANT_ROOM);
+	}
 	else {
 		se_fl_clr(h2s->sd, SE_FL_RCV_MORE | SE_FL_WANT_ROOM);
 		if (h2s->flags & H2_SF_ES_RCVD) {
@@ -6846,6 +6856,7 @@ static size_t h2_rcv_buf(struct stconn *sc, struct buffer *buf, size_t count, in
 		h2c_restart_reading(h2c, 1);
 	}
 
+ leave:
 	TRACE_LEAVE(H2_EV_STRM_RECV, h2c->conn, h2s);
 	return ret;
 }
