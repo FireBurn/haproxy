@@ -920,6 +920,7 @@ int my_unsetenv(const char *name);
  */
 char *env_expand(char *in);
 uint32_t parse_line(char *in, char *out, size_t *outlen, char **args, int *nbargs, uint32_t opts, const char **errptr);
+int read_line_to_mem(FILE *file, char **buf, size_t *size);
 size_t sanitize_for_printing(char *line, size_t pos, size_t width);
 void update_word_fingerprint(uint8_t *fp, const char *word);
 void make_word_fingerprint(uint8_t *fp, const char *word);
