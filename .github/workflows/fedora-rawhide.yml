@@ -23,7 +23,7 @@ jobs:
       run: |
         dnf -y install git pcre-devel zlib-devel pcre2-devel 'perl(FindBin)' perl-IPC-Cmd 'perl(File::Copy)' 'perl(File::Compare)' lua-devel socat findutils systemd-devel clang
     - name: Install VTest
-      run: scripts/build-vtest.sh
+      run: VTEST_URL=https://github.com/haproxytech/VTest2 scripts/build-vtest.sh
     - name: Install QuicTLS
       run: QUICTLS=yes scripts/build-ssl.sh
     - name: Build contrib tools
