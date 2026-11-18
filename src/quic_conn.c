@@ -1476,6 +1476,13 @@ int ssl_quic_initial_ctx(struct bind_conf *bind_conf)
 	SSL_CTX *ctx;
 
 	ctx = SSL_CTX_new(TLS_server_method());
+	if (!ctx) {
+		cfgerr += 1;
+		ha_alert("Proxy '%s': failed to create an SSL context for bind '%s' at [%s:%d].\n",
+			 bind_conf->frontend->id, bind_conf->arg, bind_conf->file, bind_conf->line);
+		goto end;
+	}
+
 	bind_conf->initial_ctx = ctx;
 
 	SSL_CTX_set_options(ctx, options);
@@ -1531,6 +1538,7 @@ int ssl_quic_initial_ctx(struct bind_conf *bind_conf)
 		cfgerr++;
 #endif
 
+ end:
 	return cfgerr;
 }
 
