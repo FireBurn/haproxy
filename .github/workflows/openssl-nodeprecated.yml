@@ -25,7 +25,7 @@ jobs:
     - uses: actions/checkout@v4
     - name: Install VTest
       run: |
-        scripts/build-vtest.sh
+        VTEST_URL=https://github.com/haproxytech/VTest2 scripts/build-vtest.sh
     - name: Compile HAProxy
       run: |
         make DEFINE="-DOPENSSL_API_COMPAT=0x10100000L -DOPENSSL_NO_DEPRECATED" -j3 CC=gcc ERR=1 TARGET=linux-glibc USE_OPENSSL=1

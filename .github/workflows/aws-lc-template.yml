@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install VTest
         run: |
-          scripts/build-vtest.sh
+          VTEST_URL=https://github.com/haproxytech/VTest2 scripts/build-vtest.sh
       - name: Determine latest AWS-LC release
         id: get_aws_lc_release
         run: |

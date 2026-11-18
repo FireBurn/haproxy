@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install VTest
         run: |
-          scripts/build-vtest.sh
+          VTEST_URL=https://github.com/haproxytech/VTest2 scripts/build-vtest.sh
       - name: Install apt dependencies
         run: |
           sudo apt-get update -o Acquire::Languages=none -o Acquire::Translation=none
