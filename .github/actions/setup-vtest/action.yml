@@ -25,7 +25,7 @@ runs:
       id: vtest-sha
       shell: sh
       run: |
-        echo "sha=$(git ls-remote https://code.vinyl-cache.org/vtest/VTest2 HEAD | cut -f1)" >> $GITHUB_OUTPUT
+        echo "sha=$(git ls-remote https://github.com/haproxytech/VTest2 HEAD | cut -f1)" >> $GITHUB_OUTPUT
 
     - name: Cache VTest
       id: cache-vtest
@@ -38,7 +38,7 @@ runs:
       if: ${{ steps.cache-vtest.outputs.cache-hit != 'true' }}
       shell: sh
       run: |
-        DESTDIR=${{ github.workspace }}/vtest scripts/build-vtest.sh
+        VTEST_URL=https://github.com/haproxytech/VTest2 DESTDIR=${{ github.workspace }}/vtest scripts/build-vtest.sh
 
     - name: Install problem matcher for VTest
       shell: sh
