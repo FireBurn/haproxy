@@ -1868,6 +1868,8 @@ static int peer_treat_updatemsg(struct appctx *appctx, struct peer *p, int updt,
 		}
 
 		to_store = MIN(to_read, table->key_size - 1);
+		if (to_store + table->proto_size > global.tune.bufsize)
+			to_store = global.tune.bufsize - table->proto_size;
 		if (*msg_cur + to_store > msg_end) {
 			TRACE_PROTO("malformed message", PEERS_EV_UPDTMSG,
 			            NULL, p, *msg_cur);
