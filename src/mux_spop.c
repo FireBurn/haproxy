@@ -1681,7 +1681,7 @@ static int spop_conn_handle_hello(struct spop_conn *spop_conn)
 		}
 
 		/* Check "version" K/V item */
-		if (sz >= strlen(SPOP_VERSION_KEY) && !memcmp(str, SPOP_VERSION_KEY, strlen(SPOP_VERSION_KEY))) {
+		if (sz == strlen(SPOP_VERSION_KEY) && !memcmp(str, SPOP_VERSION_KEY, sz)) {
 			int type = *p++;
 
 			/* The value must be a string */
@@ -1705,7 +1705,7 @@ static int spop_conn_handle_hello(struct spop_conn *spop_conn)
 			}
 		}
 		/* Check "max-frame-size" K/V item */
-		else if (sz >= strlen(SPOP_MAX_FRAME_SIZE_KEY) && !memcmp(str, SPOP_MAX_FRAME_SIZE_KEY, SPOP_SLEN(SPOP_MAX_FRAME_SIZE_KEY))) {
+		else if (sz == strlen(SPOP_MAX_FRAME_SIZE_KEY) && !memcmp(str, SPOP_MAX_FRAME_SIZE_KEY, sz)) {
 			int type = *p++;
 
 			/* The value must be integer */
@@ -1727,7 +1727,7 @@ static int spop_conn_handle_hello(struct spop_conn *spop_conn)
 			max_frame_size = sz;
 		}
 		/* Check "capabilities" K/V item */
-		else if (sz >= strlen(SPOP_CAPABILITIES_KEY) && !memcmp(str, SPOP_CAPABILITIES_KEY, SPOP_SLEN(SPOP_CAPABILITIES_KEY))) {
+		else if (sz == strlen(SPOP_CAPABILITIES_KEY) && !memcmp(str, SPOP_CAPABILITIES_KEY, sz)) {
 			int type = *p++;
 
 			/* The value must be a string */
@@ -1851,7 +1851,7 @@ static int spop_conn_handle_disconnect(struct spop_conn *spop_conn)
 		}
 
                 /* Check "status-code" K/V item */
-                if (sz >= strlen(SPOP_STATUS_CODE_KEY) && !memcmp(str, SPOP_STATUS_CODE_KEY, strlen(SPOP_STATUS_CODE_KEY))) {
+                if (sz == strlen(SPOP_STATUS_CODE_KEY) && !memcmp(str, SPOP_STATUS_CODE_KEY, sz)) {
                         int type = *p++;
 
                         /* The value must be an integer */
@@ -1870,7 +1870,7 @@ static int spop_conn_handle_disconnect(struct spop_conn *spop_conn)
                 }
 		// TODO: for now skip the reason
                 /* /\* Check "message" K/V item *\/ */
-                /* else if (sz >= strlen(SPOP_MSG_KEY) && !memcmp(str, SPOP_MSG_KEY, strlen(SPOP_MSG_KEY))) { */
+                /* else if (sz == strlen(SPOP_MSG_KEY) && !memcmp(str, SPOP_MSG_KEY, sz)) { */
                 /*         int type = *p++; */
 
                 /*         /\* The value must be a string *\/ */
