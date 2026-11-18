@@ -9,6 +9,7 @@
  * 2 of the License, or (at your option) any later version.
  *
  */
+#include <errno.h>
 
 #include <import/eb32tree.h>
 #include <import/ebmbtree.h>
@@ -7381,6 +7382,23 @@ static int h2_takeover(struct connection *conn, int orig_tid)
 /* functions below are dedicated to the config parsers */
 /*******************************************************/
 
+/* Parses <arg> as a decimal integer into <*val>. Returns 0 on success, or -1
+ * if <arg> is empty, contains anything but an optional sign and digits, or
+ * does not fit in an int.
+ */
+static int h2_parse_int(const char *arg, int *val)
+{
+	char *end;
+	long v;
+
+	errno = 0;
+	v = strtol(arg, &end, 10);
+	if (!*arg || *end || errno || v < INT_MIN || v > INT_MAX)
+		return -1;
+	*val = v;
+	return 0;
+}
+
 /* config parser for global "tune.h2.{fe,be}.glitches-threshold" */
 static int h2_parse_glitches_threshold(char **args, int section_type, struct proxy *curpx,
 				       const struct proxy *defpx, const char *file, int line,
@@ -7394,8 +7412,7 @@ static int h2_parse_glitches_threshold(char **args, int section_type, struct pro
 	/* backend/frontend */
 	vptr = (args[0][8] == 'b') ? &h2_be_glitches_threshold : &h2_fe_glitches_threshold;
 
-	*vptr = atoi(args[1]);
-	if (*vptr < 0) {
+	if (h2_parse_int(args[1], vptr) || *vptr < 0) {
 		memprintf(err, "'%s' expects a positive numeric value.", args[0]);
 		return -1;
 	}
@@ -7410,8 +7427,8 @@ static int h2_parse_header_table_size(char **args, int section_type, struct prox
 	if (too_many_args(1, args, err, NULL))
 		return -1;
 
-	h2_settings_header_table_size = atoi(args[1]);
-	if (h2_settings_header_table_size < 4096 || h2_settings_header_table_size > 65536) {
+	if (h2_parse_int(args[1], &h2_settings_header_table_size) ||
+	    h2_settings_header_table_size < 4096 || h2_settings_header_table_size > 65536) {
 		memprintf(err, "'%s' expects a numeric value between 4096 and 65536.", args[0]);
 		return -1;
 	}
@@ -7433,8 +7450,7 @@ static int h2_parse_initial_window_size(char **args, int section_type, struct pr
 	       (args[0][8] == 'f') ? &h2_fe_settings_initial_window_size :
 	       &h2_settings_initial_window_size;
 
-	*vptr = atoi(args[1]);
-	if (*vptr < 0) {
+	if (h2_parse_int(args[1], vptr) || *vptr < 0) {
 		memprintf(err, "'%s' expects a positive numeric value.", args[0]);
 		return -1;
 	}
@@ -7456,11 +7472,11 @@ static int h2_parse_max_concurrent_streams(char **args, int section_type, struct
 	       (args[0][8] == 'f') ? &h2_fe_settings_max_concurrent_streams :
 	       &h2_settings_max_concurrent_streams;
 
-	*vptr = atoi(args[1]);
-	if ((int)*vptr < 0) {
+	if (h2_parse_int(args[1], (int *)vptr) || (int)*vptr < 0) {
 		memprintf(err, "'%s' expects a positive numeric value.", args[0]);
 		return -1;
 	}
+
 	return 0;
 }
 
@@ -7477,8 +7493,7 @@ static int h2_parse_max_total_streams(char **args, int section_type, struct prox
 	/* frontend only for now */
 	vptr = &h2_fe_max_total_streams;
 
-	*vptr = atoi(args[1]);
-	if ((int)*vptr < 0) {
+	if (h2_parse_int(args[1], (int *)vptr) || (int)*vptr < 0) {
 		memprintf(err, "'%s' expects a positive numeric value.", args[0]);
 		return -1;
 	}
@@ -7493,8 +7508,8 @@ static int h2_parse_max_frame_size(char **args, int section_type, struct proxy *
 	if (too_many_args(1, args, err, NULL))
 		return -1;
 
-	h2_settings_max_frame_size = atoi(args[1]);
-	if (h2_settings_max_frame_size < 16384 || h2_settings_max_frame_size > 16777215) {
+	if (h2_parse_int(args[1], &h2_settings_max_frame_size) ||
+	    h2_settings_max_frame_size < 16384 || h2_settings_max_frame_size > 16777215) {
 		memprintf(err, "'%s' expects a numeric value between 16384 and 16777215.", args[0]);
 		return -1;
 	}
