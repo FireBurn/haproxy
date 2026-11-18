@@ -1,6 +1,56 @@
 ChangeLog :
 ===========
 
+2026/11/18 : 2.6.36
+    - MINOR: quic: convert qc_stream_desc release field to flags
+    - BUG/MEDIUM: quic: handle retransmit for standalone FIN STREAM
+    - BUG/MINOR: quic: prevent freeze after early QCS closure
+    - BUG/MEDIUM: quic: support wait-for-handshake
+    - MINOR: quic: simplify qc_parse_pkt_frms() return path
+    - MINOR: quic: use dynamically allocated frame on parsing
+    - MINOR: quic: extend return value of CRYPTO parsing
+    - BUG/MINOR: quic: repeat packet parsing to deal with fragmented CRYPTO
+    - BUG/MEDIUM: quic: prevent crash due to CRYPTO parsing error
+    - BUG/MEDIUM: task: do not destroy twice the tasks already killed in mworker_cleantasks()
+    - BUG/MEDIUM: peers: keep the earliest sync task deadline
+    - BUG/MEDIUM: h1: make the Connection/Upgrade headers cleanup idempotent
+    - BUG/MINOR: h1: keep accepting unsafe violations after a parser reset
+    - BUG/MEDIUM: h1: don't rewrite the Upgrade header when not cleaning headers
+    - BUG/MEDIUM: h1-htx: don't stall on messages ending exactly at the buffer's end
+    - BUG/MEDIUM: mux-h1: don't truncate responses on soft-stop
+    - BUG/MINOR: mux-h1: only reset the session's timing info on the frontend side
+    - BUG/MINOR: mux-h1: fix the open streams counter on stream creation failure
+    - BUG/MINOR: h1: forget a previous pass' results when parsing headers only
+    - BUG/MINOR: mux-h1: convert the <from> argument of h1-case-adjust to lower case
+    - BUG/MINOR: mux-h1: search the websocket key in the right message
+    - BUG/MEDIUM: mux-h1: don't spread-close idle conns with idle-close-on-response
+    - BUG/MEDIUM: resolvers: reject too long labels when encoding a name
+    - BUG/MAJOR: mux-h2: split absolute URIs like the HTTP analysers do on output
+    - BUG/MINOR: sample: Fix wrong 'base64urldec' return value check in 'jwt_member_query'
+    - BUG/MINOR: h3: enforce maxrewrite on request headers
+    - BUG/MAJOR: h3: always check :path for all scheme values
+    - BUG/MEDIUM: connection: don't leak the fd of an accepted connection
+    - BUG/MEDIUM: fd: Mark a fd as dead on early close
+    - BUG/MEDIUM: peers: do not keep a dict entry cached when its update was not sent
+    - BUG/MINOR: sample: realign the ungrpc converter on message boundaries
+    - BUG/MEDIUM: ssl/cli: reset the ongoing transaction when "commit ssl cert" is interrupted
+    - BUG/MEDIUM: mux-fcgi: do not enforce the timeout on connections with streams
+    - BUG/MEDIUM: quic: fix loss time selection in quic_loss_pktns()
+    - BUG/MEDIUM: resolvers: detach servers without resolvers from the SRV request
+    - BUG/MINOR: cfgparse: detect unsupported crypt() hashes on Debian/Ubuntu
+    - BUG/MINOR: stick-table: release server_key on any stksess destruction
+    - BUG/MEDIUM: cache: do not create a second applet when two cache-use rules hit
+    - BUG/MEDIUM: cache: forbid cache rules in defaults sections
+    - BUG/MAJOR: buf: make the shift distance check less strict in b_move()
+    - BUG/MAJOR: h3: do not panic on HTX_FL_PARSING_ERROR after htx_xfer()
+    - BUG/MAJOR: mux-quic: fail on impossible data transfers in rcv_buf()
+    - BUG/MAJOR: mux-h2: fail on impossible data transfers in rcv_buf()
+    - BUG/MINOR: ssl: exclude wolfSSL from custom extension support
+    - BUG/MEDIUM: h3: reject standalone FIN on invalid request/response
+    - SCRIPTS: vtest: allow overriding the Git repository URL
+    - CI: github: use haproxytech/VTest2 for regression tests
+    - CI: github: use haproxytech/VTest2 for musl regression tests
+
 2026/10/14 : 2.6.35
     - BUG/MEDIUM: sink: reconnect attempt not working after session lasted more than ~25 days
     - BUG/MEDIUM: flt-http-comp: Block HTX_FL_EOM flag till the end of compression
