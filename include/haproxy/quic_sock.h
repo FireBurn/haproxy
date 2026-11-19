@@ -51,6 +51,8 @@ ssize_t quic_lstnr_sock_send(struct listener *l, const void *buf, size_t len,
 int qc_rcv_buf(struct quic_conn *qc);
 void quic_conn_sock_fd_iocb(int fd);
 
+void quic_accept_wakeup(struct listener *l);
+
 /* Set default value for <qc> socket as uninitialized. */
 static inline void qc_init_fd(struct quic_conn *qc)
 {
