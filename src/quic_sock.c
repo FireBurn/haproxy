@@ -1084,6 +1084,19 @@ static void quic_accept_refuse_qc(struct quic_conn *qc)
 	tasklet_wakeup(qc->wait_event.tasklet);
 }
 
+/* Wakes up the accept tasklets of the threads with connections queued on <l>. */
+void quic_accept_wakeup(struct listener *l)
+{
+	uint grp = l->rx.bind_tgroup ? l->rx.bind_tgroup : 1;
+	const struct tgroup_info *tg = &ha_tgroup_info[grp - 1];
+	int i;
+
+	for (i = 0; i < tg->count; i++) {
+		if (!MT_LIST_ISEMPTY(&l->per_thr[i].quic_accept.conns))
+			tasklet_wakeup(quic_accept_queues[tg->base + i].tasklet);
+	}
+}
+
 /* Install <qc> on the queue ready to be accepted. The queue task is then woken
  * up.
  */
@@ -1146,8 +1159,11 @@ struct task *quic_accept_run(struct task *t, void *ctx, unsigned int i)
 			listener_accept(lthr->li);
 
 		if (!MT_LIST_ISEMPTY(&lthr->quic_accept.conns)) {
-			/* entry is left in queue */
-			tasklet_wakeup((struct tasklet*)t);
+			/* entry is left in queue, retry only if the listener
+			 * can still accept, it is woken up on resume otherwise.
+			 */
+			if (lthr->li->state == LI_READY)
+				tasklet_wakeup((struct tasklet*)t);
 		}
 		else {
 			mt_list_unlock_self(&lthr->quic_accept.list);
