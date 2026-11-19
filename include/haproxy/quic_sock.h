@@ -43,6 +43,8 @@ void quic_sock_fd_iocb(int fd);
 int qc_snd_buf(struct quic_conn *qc, const struct buffer *buf, size_t count,
                int flags);
 
+void quic_accept_wakeup(struct listener *l);
+
 void quic_accept_push_qc(struct quic_conn *qc);
 
 #endif /* USE_QUIC */
