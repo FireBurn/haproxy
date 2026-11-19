@@ -1096,6 +1096,16 @@ void qc_want_recv(struct quic_conn *qc)
 /* per-thread accept queues */
 struct quic_accept_queue *quic_accept_queues;
 
+/* Closes <qc> whose handshake is complete but which cannot be accepted
+ * anymore.
+ */
+static void quic_accept_refuse_qc(struct quic_conn *qc)
+{
+	TRACE_STATE("refusing connection on unbound listener", QUIC_EV_CONN_CLOSE, qc);
+	quic_set_connection_close(qc, quic_err_transport(QC_ERR_CONNECTION_REFUSED));
+	tasklet_wakeup(qc->wait_event.tasklet);
+}
+
 /* Install <qc> on the queue ready to be accepted. The queue task is then woken
  * up.
  */
@@ -1108,9 +1118,15 @@ void quic_accept_push_qc(struct quic_conn *qc)
 	BUG_ON(qc->flags & QUIC_FL_CONN_ACCEPT_REGISTERED);
 
 	BUG_ON(MT_LIST_INLIST(&qc->accept_list));
-	HA_ATOMIC_INC(&qc->li->rx.quic_curr_accept);
-
 	qc->flags |= QUIC_FL_CONN_ACCEPT_REGISTERED;
+
+	/* the listener was unbound meanwhile, e.g. by a soft-stop */
+	if (!(qc->li->rx.flags & RX_F_BOUND)) {
+		quic_accept_refuse_qc(qc);
+		return;
+	}
+
+	HA_ATOMIC_INC(&qc->li->rx.quic_curr_accept);
 	/* 1. insert the listener in the accept queue
 	 *
 	 * Use TRY_APPEND as there is a possible race even with INLIST if
@@ -1137,7 +1153,19 @@ struct task *quic_accept_run(struct task *t, void *ctx, unsigned int i)
 	struct quic_accept_queue *queue = &quic_accept_queues[tid];
 
 	mt_list_for_each_entry_safe(lthr, &queue->listeners, quic_accept.list, elt1, elt2) {
-		listener_accept(lthr->li);
+		if (!(lthr->li->rx.flags & RX_F_BOUND)) {
+			struct quic_conn *qc;
+
+			/* the listener was unbound, nothing can be accepted anymore */
+			while ((qc = MT_LIST_POP(&lthr->quic_accept.conns, struct quic_conn *, accept_list))) {
+				BUG_ON(lthr->li->rx.quic_curr_accept <= 0);
+				HA_ATOMIC_DEC(&lthr->li->rx.quic_curr_accept);
+				quic_accept_refuse_qc(qc);
+			}
+		}
+		else
+			listener_accept(lthr->li);
+
 		if (!MT_LIST_ISEMPTY(&lthr->quic_accept.conns))
 			tasklet_wakeup((struct tasklet*)t);
 		else
