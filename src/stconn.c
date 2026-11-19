@@ -485,6 +485,11 @@ int sc_reset_endp(struct stconn *sc)
  * handler using sc_replace_endp(), possibly from within the function itself.
  * It also pre-initializes the applet's context and returns it (or NULL in case
  * it could not be allocated).
+ *
+ * It must only be called on a detached stream connector, with no endpoint
+ * attached. It fails if the SE_FL_DETACHED flag is not set, because it is
+ * cleared when an applet is attached. This way, it is not possible to install
+ * an applet on a stream connector with an applet already attached.
  */
 struct appctx *sc_applet_create(struct stconn *sc, struct applet *app)
 {
@@ -492,6 +497,8 @@ struct appctx *sc_applet_create(struct stconn *sc, struct applet *app)
 
 	DPRINTF(stderr, "registering handler %p for sc %p (was %p)\n", app, sc, sc_strm_task(sc));
 
+	if (!sc_ep_test(sc, SE_FL_DETACHED))
+		return NULL;
 	appctx = appctx_new_here(app, sc->sedesc);
 	if (!appctx)
 		return NULL;
