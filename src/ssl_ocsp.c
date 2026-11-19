@@ -1282,7 +1282,7 @@ static struct task *ssl_ocsp_update_responses(struct task *task, void *context, 
 			int found = 0;
 			/* Look for "Content-Type" header which should have
 			 * "application/ocsp-response" value. */
-			for (hdr = hc->res.hdrs; isttest(hdr->v); hdr++) {
+			for (hdr = hc->res.hdrs; hdr && isttest(hdr->n); hdr++) {
 				if (isteqi(hdr->n, ist("Content-Type")) &&
 				    isteqi(hdr->v, ist("application/ocsp-response"))) {
 					found = 1;
