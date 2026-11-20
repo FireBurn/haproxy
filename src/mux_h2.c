@@ -928,6 +928,14 @@ static int h2_buf_available(void *target)
 	}
 
 	if ((h2c->flags & H2_CF_DEM_SALLOC) &&
+	    !h2s_sc(h2c_st_by_id(h2c, h2c->dsi))) {
+		/* no stream to allocate for, let the demux retry */
+		h2c->flags &= ~H2_CF_DEM_SALLOC;
+		h2c_restart_reading(h2c, 1);
+		progress = 1;
+	}
+
+	if ((h2c->flags & H2_CF_DEM_SALLOC) &&
 	    (h2s = h2c_st_by_id(h2c, h2c->dsi)) && h2s_sc(h2s) &&
 	    b_alloc(&h2s->rxbuf)) {
 		h2c->flags &= ~H2_CF_DEM_SALLOC;
