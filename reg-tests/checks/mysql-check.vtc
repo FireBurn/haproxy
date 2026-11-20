@@ -37,6 +37,16 @@ server s5 {
   sendhex "67000002FFE304436C69656E7420646F6573206E6F7420737570706F72742061757468656E7469636174696F6E2070726F746F636F6C20726571756573746564206279207365727665723B20636F6E736964657220757067726164696E67204D7953514C20636C69656E74"
 } -start
 
+server s12 {
+  sendhex "2C0000000A382E302E31392D6E6F7465726D424242424242424242424242424242424242424242424242424242424242"
+  expect_close
+} -start
+
+syslog S12 -level notice {
+    recv
+    expect ~ "[^:\\[ ]\\[${h1_pid}\\]: Health check for server be12/srv succeeded, reason: Layer7 check passed.+info: \"8.0.19-notermBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB\".+check duration: [[:digit:]]+ms, status: 1/1 UP."
+} -start
+
 syslog S1 -level notice {
     recv
     expect ~ "[^:\\[ ]\\[${h1_pid}\\]: Health check for server be1/srv succeeded, reason: Layer7 check passed.+info: \"8.0.19\".+check duration: [[:digit:]]+ms, status: 1/1 UP."
@@ -114,6 +124,12 @@ haproxy h1 -conf {
         tcp-request content reject
         server srv ${s3_addr}:${s3_port}
 
+    backend be12
+        log ${S12_addr}:${S12_port} daemon
+        option log-health-checks
+        option mysql-check
+        server srv ${s12_addr}:${s12_port} check inter 1s rise 1 fall 1
+
 } -start
 
 syslog S1 -wait
@@ -121,3 +137,4 @@ syslog S2 -wait
 syslog S3 -wait
 syslog S4 -wait
 syslog S5 -wait
+syslog S12 -wait
