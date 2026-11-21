@@ -579,6 +579,9 @@ struct pattern *pat_match_regm(struct sample *smp, struct pattern_expr *expr, in
 	struct pattern *pattern;
 	struct pattern *ret = NULL;
 
+	if (!smp->data.u.str.data)
+		return ret;
+
 	list_for_each_entry(lst, &expr->patterns, list) {
 		pattern = &lst->pat;
 
@@ -604,6 +607,9 @@ struct pattern *pat_match_reg(struct sample *smp, struct pattern_expr *expr, int
 	struct pattern *pattern;
 	struct pattern *ret = NULL;
 	struct lru64 *lru = NULL;
+
+	if (!smp->data.u.str.data)
+		return ret;
 
 	if (pat_lru_tree) {
 		unsigned long long seed = pat_lru_seed ^ (long)expr;
