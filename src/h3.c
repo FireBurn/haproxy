@@ -334,6 +334,19 @@ static int h3_is_frame_valid(struct h3c *h3c, struct qcs *qcs, uint64_t ftype)
 		/* TODO server-side only. */
 		return 0;
 
+	case H3_FT_RESERVED_1:
+	case H3_FT_RESERVED_2:
+	case H3_FT_RESERVED_3:
+	case H3_FT_RESERVED_4:
+		/* RFC 9114 7.2.8. Reserved Frame Types
+		 *
+		 * Frame types that were used in HTTP/2 where there is no corresponding
+		 * HTTP/3 frame have also been reserved (Section 11.2.1). These frame
+		 * types MUST NOT be sent, and their receipt MUST be treated as a
+		 * connection error of type H3_FRAME_UNEXPECTED.
+		 */
+		return 0;
+
 	default:
 		/* draft-ietf-quic-http34 9. Extensions to HTTP/3
 		 *
