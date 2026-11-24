@@ -88,6 +88,7 @@ struct acme_auth {
        struct ist auth;   /* auth URI */
        struct ist chall;  /* challenge URI */
        struct ist token;  /* token */
+       int wildcard;      /* authorization covers *.dns */
        int validated;     /* already validated */
        struct acme_rslv *rslv; /* acme dns-01 resolver */
        int ready;         /* is the challenge ready ? */

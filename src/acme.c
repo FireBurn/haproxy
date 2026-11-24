@@ -2031,6 +2031,7 @@ int acme_res_auth(struct task *task, struct acme_ctx *ctx, struct acme_auth *aut
 	t2->data = ret;
 
 	mjson_get_bool(hc->res.buf.area, hc->res.buf.data, "$.wildcard", &wildcard);
+	auth->wildcard = wildcard;
 
 	auth->dns = istdup(ist2(t2->area, t2->data));
 
@@ -2166,8 +2167,8 @@ int acme_res_auth(struct task *task, struct acme_ctx *ctx, struct acme_auth *aut
 			auth->token = istdup(ist2(dns_record->area, dns_record->data));
 
 			if (ctx->cfg->cond_ready & ACME_RDY_CLI)
-				send_log(NULL, LOG_NOTICE,"acme: %s: dns-01 requires to set the \"_acme-challenge.%.*s\" TXT record to \"%.*s\" and use the \"acme challenge_ready %s domain %.*s\" command over the CLI\n",
-			                                             ctx->store->path, (int)auth->dns.len, auth->dns.ptr, (int)auth->token.len, auth->token.ptr, ctx->store->path, (int)auth->dns.len, auth->dns.ptr);
+				send_log(NULL, LOG_NOTICE,"acme: %s: dns-01 requires to set the \"_acme-challenge.%.*s\" TXT record to \"%.*s\" and use the \"acme challenge_ready %s domain %s%.*s\" command over the CLI\n",
+				                                             ctx->store->path, (int)auth->dns.len, auth->dns.ptr, (int)auth->token.len, auth->token.ptr, ctx->store->path, auth->wildcard ? "*." : "", (int)auth->dns.len, auth->dns.ptr);
 
 			/* dump to the "dpapi" sink */
 			line[nmsg++] = ist("acme deploy ");
@@ -3551,11 +3552,14 @@ static int cli_acme_chall_ready_parse(char **args, char *payload, struct appctx 
 	HA_RWLOCK_WRLOCK(OTHER_LOCK, &acme_lock);
 	node = ebst_lookup(&acme_tasks, crt);
 	if (node) {
+		int wildcard = strncmp(dns, "*.", 2) == 0;
+		struct ist domain = ist(dns + (wildcard ? 2 : 0));
+
 		ctx = ebmb_entry(node, struct acme_ctx, node);
 		if (ctx->cfg->cond_ready & ACME_RDY_CLI)
 			auth = ctx->auths;
 		while (auth) {
-			if (isteq(ist(dns), auth->dns)) {
+			if (auth->wildcard == wildcard && isteq(domain, auth->dns)) {
 				if (!(auth->ready & ACME_RDY_CLI)) {
 					auth->ready |= ACME_RDY_CLI;
 					found++;
