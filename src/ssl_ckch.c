@@ -1042,6 +1042,7 @@ struct ckch_store *ckchs_dup(const struct ckch_store *src)
 		goto error;
 
 
+	dst->conf.used = src->conf.used;
 	dst->conf.ocsp_update_mode = src->conf.ocsp_update_mode;
 
         /* copy ckch_conf
