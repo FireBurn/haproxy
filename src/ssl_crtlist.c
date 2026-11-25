@@ -1315,6 +1315,8 @@ static int cli_parse_add_crtlist(char **args, char *payload, struct appctx *appc
 	struct crtlist *crtlist;
 	struct crtlist_entry *entry = NULL;
 	struct ckch_conf cc = {};
+	struct ckch_conf old_cc = {};
+	int adopted = 0;
 	char *end;
 
 	if (!cli_has_level(appctx, ACCESS_LVL_ADMIN))
@@ -1394,7 +1396,9 @@ static int cli_parse_add_crtlist(char **args, char *payload, struct appctx *appc
 	 */
 	if (LIST_ISEMPTY(&store->ckch_inst)) {
 
+		old_cc = store->conf;
 		store->conf = cc;
+		adopted = 1;
 		/* fresh new, run more init (for example init ocsp-update tasks) */
 		cfgerr |= ckch_store_load_files(&cc, store, 1, &err);
 		if (cfgerr & ERR_FATAL)
@@ -1432,6 +1436,9 @@ static int cli_parse_add_crtlist(char **args, char *payload, struct appctx *appc
 	return 0;
 
 error:
+	/* the store must not keep the conf freed below */
+	if (adopted)
+		store->conf = old_cc;
 	ckch_conf_clean(&cc);
 	crtlist_entry_free(entry);
 	HA_SPIN_UNLOCK(CKCH_LOCK, &ckch_lock);
