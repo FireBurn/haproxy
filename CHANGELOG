@@ -1,6 +1,176 @@
 ChangeLog :
 ===========
 
+2026/11/26 : 3.2.28
+    - BUG/MINOR: resolvers: display the template name instead of "server '(null)'"
+    - MEDIUM: server: add a global setting "unresolvable-server-fqdn"
+    - DEBUG: support reading set-dumpable from HAPROXY_FORCE_DUMPABLE
+    - BUG/MINOR: h2: reject :protocol pseudo-header in H2 responses
+    - DOC: config: add missing acme.scheduler in the global index
+    - BUG/MINOR: jwt: don't truncate binary HMAC secrets at the first NULL byte
+    - BUG/MINOR: jws: fix ECDSA_SIG leak in jws_b64_signature()
+    - BUG/MINOR: jwt: enforce the ECDSA signature length in jwt_verify
+    - BUG/MINOR: quic: fix "show quic" filtered connection
+    - BUG/MINOR: mux_quic: fix overflow on avail_streams
+    - BUG/MINOR: promex: don't loop forever when a module skips a time series
+    - BUG/MINOR: http-ana: call the http_reset filter callback on L7 retries
+    - BUG/MINOR: peers: forget the appctx when the peer session init fails
+    - BUG/MINOR: peers: don't lose the peer's version when the hello is fragmented
+    - BUG/MINOR: peers: reject over-long varints in intdecode()
+    - BUG/MINOR: peers: account incoming sessions in the per-thread applet counters
+    - BUG/MINOR: peers: compare the received expiration date as unsigned
+    - BUG/MINOR: peers: don't use remote table definitions from a previous session
+    - BUG/MINOR: peers: forget the remote table when ignoring an unknown key type
+    - BUG/MINOR: hlua: unlock Patref before add_bulk type error
+    - DOC: config: Fix documentation about dot character in variable names
+    - DOC: configuration: document library compatibility for TLS keywords
+    - BUG/MINOR: thread: don't turn reversed thread ranges into "even"
+    - BUG/MINOR: cfgparse-listen: reject negative capture lengths
+    - BUG/MINOR: stick-table: reject negative stick counter IDs in sc-* actions
+    - BUG/MINOR: connection: check the NetScaler CIP header length against received data
+    - BUG/MINOR: connection: check the IP header length in NetScaler CIP
+    - BUG/MINOR: server: free the sample expression when it is not usable on a server
+    - BUG/MINOR: errors: reset diagnostic buffers after thread cleanup
+    - BUG/MINOR: debug: fix "debug dev fd" crash on unknown address families
+    - DOC: configuration: Clarify wait-for-body doc for the response side
+    - BUG/MINOR: quic: fix the header protection key length dump with AWS-LC
+    - BUG/MINOR: ssl/ckch: free the new instance when ckch_inst_rebuild() fails
+    - BUG/MINOR: httpclient/lua: fix stack overread when copying the headers
+    - BUG/MINOR: httpclient/lua: raise an error on too many request headers
+    - BUG/MINOR: ist: make ist_find_range() accept non-zero min boundaries
+    - BUG/MINOR: fd: allow fd_write_frag_line() to run before fdtab allocation
+    - BUG/MINOR: tcpcheck: check the number of "hdr" in http-check send
+    - BUG/MINOR: stick-table: reject invalid gpc/gpt array indexes
+    - DOC: minor: update VTest2 URL everywhere
+    - BUG/MEDIUM: mux-h2: consider the send list as pending data for the timeout
+    - BUG/MEDIUM: mux-h2: refresh the connection timeout before parking it idle
+    - BUG/MEDIUM: mux-fcgi: arm the connection timeout only when data remains
+    - BUG/MEDIUM: mux-fcgi: detect an early connection error during the handshake
+    - BUG/MEDIUM: mux-fcgi: ignore conn->owner when deciding if a connection is dead
+    - MINOR: mux-fcgi: don't add a closed connection to an idle list on detach
+    - BUG/MEDIUM: mux-h2: also consider the fctl_list as pending data for the timeout
+    - BUG/MEDIUM: mux-h2: always return already allocated buffers in h2_get_buf()
+    - BUG/MEDIUM: mux-h2: permit the buffer callback to allocate despite the queue
+    - BUG/MEDIUM: mux-h2: wake the connection up after a delayed mbuf allocation
+    - BUG/MEDIUM: mux-h2: serve all pending buffer allocations in the buffer callback
+    - BUG/MINOR: mux-h2: unblock the demux when destroying the stream it was blocked on
+    - BUG/MEDIUM: mux-h2: don't send RST_STREAM for backend streams whose HEADERS were not sent
+    - BUG/MINOR: mux-h2: only convert GET upgrade requests to Extended CONNECT
+    - BUG/MINOR: mjson: fix out-of-bounds reads on malformed JSON paths
+    - BUG/MEDIUM: resolvers: skip the data of ignored additional records
+    - BUG/MINOR: resolvers: reject a null or negative resolve_retries value
+    - BUG/MINOR: resolvers: reject null "timeout resolve" and "timeout retry" values
+    - BUG/MINOR: resolvers: preserve nameserver identity on "clear counters all"
+    - BUG/MINOR: resolvers: don't dump a nameserver twice in "show resolvers"
+    - BUG/MINOR: resolvers: Always init a new resolution's list element
+    - BUG/MINOR: resolvers: count nameserver timeouts
+    - BUG/MEDIUM: resolvers: reject servers sharing an SRV record with different resolvers
+    - BUG/MINOR: resolvers: check the SRV expiration date again under the lock
+    - BUG/MEDIUM: resolvers: properly skip root-named authority and additional records
+    - BUG/MINOR: resolvers: compute a name's wire length by walking its labels
+    - DOC: configuration: clarify normalize-uri version availability
+    - BUG/MINOR: ssl/ckch: fix an invalid free() in the domains/ips error paths
+    - BUG/MINOR: tools: ha_freearray() must also free the array
+    - BUG/MINOR: quic: reject RETIRE_CONNECTION_ID for a CID not sent to the peer
+    - BUG/MINOR: ssl: skip the cipher workaround with AWS-LC API 38 and newer
+    - BUG/MINOR: mux_quic: remove dangling qc->qcc ref on MUX init failure
+    - BUG/MINOR: h3: fix error code on incomplete request
+    - BUG/MEDIUM: threads: don't read lock history entries that don't fit in ulong
+    - BUG/MINOR: acl: check the presence of an argument to "-u"
+    - BUG/MINOR: server: don't report dyncookie collision on same IP servers
+    - SCRIPTS: create-release: do not match the word "version" isolated
+    - BUG/MINOR: tcpcheck: fix out-of-bounds reads on short MySQL error packets
+    - BUG/MEDIUM: mux-spop: do not enforce the timeout on connections with streams
+    - MINOR: mux-spop: ignore conn->owner when deciding if a connection is dead
+    - BUG/MEDIUM: mux-spop: refresh the connection timeout before parking it idle
+    - MINOR: mux-spop: don't add a closing connection to an idle list on detach
+    - BUG/MINOR: cache: do not refuse to store responses with "Age: 0"
+    - BUG/MINOR: cache: do not remove the Age header from the forwarded response
+    - BUG/MINOR: cache: recognize null qvalues with decimals in Accept-Encoding
+    - BUG/MINOR: cache: do not eat the request while waiting for a buffer
+    - BUG/MINOR: cache: reduce the max-age lifetime by the response's Age
+    - BUG/MINOR: cache: compare the Age to the heuristic lifetime when none is given
+    - BUG/MINOR: cache: do not ignore null lifetimes not written as "max-age=0"
+    - REGTESTS: cache: cover the object lifetime with a single script
+    - BUG/MINOR: h3: prevent missing request FIN on empty trailers
+    - BUG/MEDIUM: filters: Don't propagate a close while a filter waits on a channel
+    - BUG/MEDIUM: mux-fcgi: put BE conn back in idle list after deferred shut
+    - BUG/MINOR: cache: skip already resolved filters when resolving caches
+    - BUG/MINOR: sample: fix host_only and port_only on empty input
+    - BUG/MINOR: sample: reject a \0 byte in raw string fetches
+    - BUG/MINOR: http-ana: don't emit a network-path Location for a "/" redirect prefix
+    - BUG/MINOR: log: don't let an LF in a forwarded message create new events
+    - BUG/MEDIUM: sample: parse json_query integers within the token length
+    - BUG/MINOR: mjson: bound the exponent in mystrtod()
+    - BUG/MEDIUM: stick-tables: compute the shard of string keys on the stored key
+    - BUG/MEDIUM: quic: do not keep 0-RTT packets which cannot be decrypted
+    - MINOR: ssl: add alpn_remove_token() to drop a protocol from an ALPN string
+    - MINOR: global: add tune.options2 to host new GTUNE2_* flags
+    - MINOR: global: add tune.h2.fe.enabled to disable HTTP/2 on frontends
+    - MINOR: sample: add h2_enabled to report whether H2 may be used on frontends
+    - REGTEST: ssl: test tune.h2.fe.enabled and h2_enabled on two instances
+    - BUG/MEDIUM: stick-tables/cli: "set table" without key must not clear the table
+    - BUG/MEDIUM: peers: make the soft-stop "dont_stop" state per peers section
+    - BUG/MEDIUM: mux-h2: don't abort a tunnel attempt on interim responses
+    - REGTESTS: http-messaging: check that 1xx don't abort H2 backend tunnels
+    - BUG/MEDIUM: dns: release the session slot of expired TCP queries
+    - BUG/MEDIUM: peers: bound stick-table update messages
+    - BUG/MEDIUM: peers: bound stick-table switch messages
+    - BUG/MINOR: peers: bound stick-table acknowledge messages
+    - MINOR: peers: move message length constants to peers-t.h
+    - BUG/MEDIUM: stick-table: fix the peers overhead in proto_size
+    - BUG/MEDIUM: peers: trim received string keys to fit in a buffer
+    - BUG/MINOR: quic/ssl: report SSL_CTX allocation failure
+    - BUG/MEDIUM: payload: reject out-of-range payload and payload_lv arguments
+    - BUG/MINOR: payload: also encode an absolute payload_lv offset2
+    - BUG/MINOR: sample: do not parse compressed gRPC messages in ungrpc
+    - BUG/MINOR: ncbuf/test: remove list dependency for standalone tests
+    - BUG/MINOR: ncbuf/test: remove unnecessary delay in random insert
+    - BUG/MEDIUM: hlua: make coroutine.create() safe under haproxy (new attempt)
+    - BUG/MINOR: ssl/cli: use the right list member in "add ssl crt-list" release
+    - BUG/MINOR: resolvers: reject DNS messages without the QR bit
+    - BUG/MINOR: intops: reject varints that do not fit in 64 bits in decode_varint()
+    - BUG/MINOR: mux-spop: match the AGENT-HELLO and AGENT-DISCONNECT keys exactly
+    - BUG/MINOR: mqtt: reject invalid CONNECT flags and MQTT 3.1.1 CONNACK return codes
+    - BUG/MINOR: tcpcheck: fix out-of-bounds reads on truncated LDAP bind responses
+    - BUG/MINOR: tcpcheck: fix out-of-bounds reads on truncated SPOP hello frames
+    - BUG/MEDIUM: mux-h2: don't stall on a failed rxbuf alloc without stream
+    - BUG/MEDIUM: mux-fcgi: let the buffer callback allocate despite the queue
+    - BUG/MEDIUM: mux-spop: let the buffer callback allocate despite the queue
+    - BUG/MINOR: tcpcheck: fix out-of-bounds read on the MySQL server version
+    - BUG/MINOR: vars: fix missing string termination in get var on too long values
+    - BUG/MINOR: lua: channel: append() must insert data at the end, not at the start
+    - BUG/MINOR: quic: fix uninitialized read of pkt->rs.delivered in ACK processing (BBR)
+    - BUG/MINOR: payload: distcc_body must not sample unreceived buffer bytes
+    - BUG/MEDIUM: pattern: check for non-empty string before matching regexes
+    - BUG/MEDIUM: mux-fcgi: avoid out-of-bounds path decoding
+    - BUG/MEDIUM: stconn: Do not install an applet on a busy stream connector
+    - BUG/MINOR: resolvers: warn about ignored arguments on datagram nameservers
+    - BUG/MINOR: map: split "add map/acl" payload keys on line breaks
+    - BUG/MEDIUM: quic: refuse handshakes completed after the listener unbind
+    - BUG/MEDIUM: mux-h2: reject non-101 2xx responses to Extended CONNECT
+    - BUG/MINOR: h3: reject reserved HTTP/2 frame types
+    - BUG/MEDIUM: mux-h1: Don't shortcut h1_process() while a stream is attached
+    - REGTESTS: tcp-check-ssl: tolerate an errno info in the SSL handshake failure
+    - REGTESTS: tcp-check-ssl: also support errno reporting on second test
+    - BUG/MINOR: ssl: append OCSP base64 newline to the output buffer
+    - MINOR: tools: add read_line_to_mem() to read a line into a growing buffer
+    - BUG/MINOR: pattern: don't rely on the trash size to read pattern files
+    - BUG/MINOR: pattern: do not index too large strings using the tree
+    - BUG/MEDIUM: mjson: stop the lookup when the matched element ends
+    - BUG/MEDIUM: mjson: decode the escaped slash in strings
+    - CLEANUP: mux-h2: clarify that bptr is not NULL when calling to h2_get_buf()
+    - BUG/MEDIUM: quic: do not spin on the accept tasklet of a blocked listener
+    - DOC: config: mention the nesting limit of the json_query() converter
+    - BUG/MEDIUM: ssl/cli: reset the transaction on interrupted CA/CRL commits
+    - BUG/MEDIUM: ssl/cli: restore the store conf on "add ssl crt-list" error
+    - BUG/MINOR: ssl/ckch: copy the origin of the conf in ckchs_dup()
+    - BUG/MEDIUM: ssl/cli: keep the crt-store conf on "add ssl crt-list"
+    - BUG/MINOR: ssl/cli: fix ckch_conf leaks in "add ssl crt-list"
+    - REGTESTS: converter: serve the two sha2 requests on one connection
+    - BUG/MINOR: mux-h2: reject non-numeric values in the tune.h2 keywords
+    - BUG/MAJOR: h3: prevent demux full BUG_ON() crash with incomplete DATA
+
 2026/11/18 : 3.2.27
     - REGTESTS: mcli: check that a program section works with a peers section
     - BUG/MEDIUM: task: do not destroy twice the tasks already killed in mworker_cleantasks()
